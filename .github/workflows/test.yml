@@ -13,6 +13,12 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+      - name: Launcher unit tests
+        shell: bash
+        working-directory: plugins/creative-attention/launcher
+        run: go test ./...
       - name: Install Claude Code (unix)
         if: runner.os != 'Windows'
         run: curl -fsSL https://claude.ai/install.sh | bash && echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -38,6 +44,42 @@ jobs:
           python3 ci/mcp_check.py ca_start,ca_status,ca_run,ca_get,ca_doctor "$cmd"
           echo "--- second start (no download)"
           python3 ci/mcp_check.py ca_start,ca_doctor "$cmd"
+      - name: Launcher refuses an app whose checksum is altered
+        shell: bash
+        run: |
+          set -eu
+          T="$RUNNER_TEMP/tamper"; rm -rf "$T"; mkdir -p "$T"
+          cp -R plugins/creative-attention "$T/plugin"
+          python3 - "$T/plugin/runtime.json" <<'PY'
+          import json, sys
+          p = sys.argv[1]
+          d = json.load(open(p))
+          s = d["app_sha256"]
+          d["app_sha256"] = ("0" if s[0] != "0" else "1") + s[1:]
+          json.dump(d, open(p, "w"))
+          PY
+          cmd="$T/plugin/bin/ca-launch"
+          case "$OSTYPE" in msys*|cygwin*) cmd="$T/plugin/bin/ca-launch.exe";; esac
+          if CLAUDE_PLUGIN_DATA="$T/data" "$cmd" </dev/null; then echo "launcher accepted a bad checksum"; exit 1; fi
+          if ls "$T"/data/app-* >/dev/null 2>&1; then echo "app dir was installed despite bad checksum"; exit 1; fi
+          echo "bad checksum refused"
+      - name: Launcher recovers after being killed mid-install
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -eu
+          export CLAUDE_PLUGIN_DATA="$RUNNER_TEMP/kill-data"; rm -rf "$CLAUDE_PLUGIN_DATA"
+          cmd=plugins/creative-attention/bin/ca-launch
+          "$cmd" </dev/null >/dev/null 2>&1 &
+          pid=$!
+          for i in $(seq 1 100); do [ -f "$CLAUDE_PLUGIN_DATA/install.lock/pid" ] && break; sleep 0.1; done
+          test -f "$CLAUDE_PLUGIN_DATA/install.lock/pid"
+          kill -9 "$pid"; wait "$pid" 2>/dev/null || true
+          test -d "$CLAUDE_PLUGIN_DATA/install.lock"   # the dead launcher left its lock behind
+          SECONDS=0
+          python3 ci/mcp_check.py ca_start,ca_doctor "$cmd"
+          echo "restart took ${SECONDS}s"
+          [ "$SECONDS" -lt 300 ]  # far below the 10 minute stale age: the dead PID was detected
       - name: Install through Claude Code and check it connects
         shell: bash
         run: |

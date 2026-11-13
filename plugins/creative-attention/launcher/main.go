@@ -7,16 +7,21 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -42,8 +47,89 @@ func fail(f string, a ...any) {
 	}
 	os.Exit(1)
 }
-func say(f string, a ...any) { fmt.Fprintln(os.Stderr, "Creative Attention setup: "+fmt.Sprintf(f, a...)) }
-func exists(p string) bool  { _, err := os.Stat(p); return err == nil }
+func say(f string, a ...any) {
+	fmt.Fprintln(os.Stderr, "Creative Attention setup: "+fmt.Sprintf(f, a...))
+}
+func exists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+var httpClient = &http.Client{Transport: &http.Transport{
+	Proxy:                 http.ProxyFromEnvironment,
+	DialContext:           (&net.Dialer{Timeout: 20 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+	TLSHandshakeTimeout:   20 * time.Second,
+	ResponseHeaderTimeout: 30 * time.Second,
+}}
+
+const (
+	stallWindow   = 60 * time.Second
+	stallMinBytes = 60 * 1024 // about 1 KB/s, like curl --speed-limit 1024 --speed-time 60
+)
+
+// fetch downloads url to dst and returns the sha256. It gives up when the transfer stalls.
+func fetch(url, dst string, window time.Duration, minBytes int64) (string, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	r, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer r.Body.Close()
+	if r.StatusCode != 200 {
+		return "", fmt.Errorf("HTTP %d", r.StatusCode)
+	}
+	out, err := os.Create(dst)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+	var n atomic.Int64
+	var stalled atomic.Bool
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		t := time.NewTicker(window)
+		defer t.Stop()
+		var last int64
+		for {
+			select {
+			case <-done:
+				return
+			case <-t.C:
+				cur := n.Load()
+				if cur-last < minBytes {
+					stalled.Store(true)
+					cancel()
+					return
+				}
+				last = cur
+			}
+		}
+	}()
+	h := sha256.New()
+	buf := make([]byte, 64*1024)
+	for {
+		k, rerr := r.Body.Read(buf)
+		if k > 0 {
+			n.Add(int64(k))
+			h.Write(buf[:k])
+			if _, werr := out.Write(buf[:k]); werr != nil {
+				return "", werr
+			}
+		}
+		if rerr == io.EOF {
+			return hex.EncodeToString(h.Sum(nil)), nil
+		}
+		if rerr != nil {
+			if stalled.Load() {
+				return "", fmt.Errorf("the download stalled")
+			}
+			return "", rerr
+		}
+	}
+}
 
 func download(url, dst string) string {
 	var lastErr error
@@ -51,30 +137,11 @@ func download(url, dst string) string {
 		if i > 0 {
 			time.Sleep(time.Duration(i) * 2 * time.Second)
 		}
-		r, err := http.Get(url)
-		if err != nil {
-			lastErr = err
-			continue
+		got, err := fetch(url, dst, stallWindow, stallMinBytes)
+		if err == nil {
+			return got
 		}
-		if r.StatusCode != 200 {
-			r.Body.Close()
-			lastErr = fmt.Errorf("HTTP %d", r.StatusCode)
-			continue
-		}
-		out, err := os.Create(dst)
-		if err != nil {
-			r.Body.Close()
-			fail("cannot write %s: %v", dst, err)
-		}
-		h := sha256.New()
-		_, err = io.Copy(io.MultiWriter(out, h), r.Body)
-		r.Body.Close()
-		out.Close()
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		return hex.EncodeToString(h.Sum(nil))
+		lastErr = err
 	}
 	fail("the download from %s failed (%v)", url, lastErr)
 	return ""
@@ -202,24 +269,22 @@ func main() {
 	app := filepath.Join(appDir, "dist", "server.js")
 
 	if !exists(node) || !exists(app) {
-		lockDir = filepath.Join(data, "install.lock")
-		for n := 0; ; n++ {
-			if err := os.Mkdir(lockDir, 0o755); err == nil {
-				break
-			}
-			if st, err := os.Stat(lockDir); err == nil && time.Since(st.ModTime()) > 20*time.Minute {
+		lock := filepath.Join(data, "install.lock")
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+		go func() {
+			<-sigs
+			if lockDir != "" {
 				os.RemoveAll(lockDir)
-				continue
 			}
-			if n == 0 {
-				say("another Claude window is setting things up, waiting for it...")
-			}
-			if n > 900 {
-				lockDir = ""
-				fail("another setup has been running for too long")
-			}
-			time.Sleep(time.Second)
+			os.Exit(130)
+		}()
+		if err := acquireLock(lock, lockStaleAfter, lockWaitFor, time.Second, func() {
+			say("another Claude window is setting things up, waiting for it...")
+		}); err != nil {
+			fail("%v", err)
 		}
+		lockDir = lock
 		if !exists(node) {
 			say("downloading Node %s (one time, about 35 MB)...", cfg.NodeVersion)
 			tmp, err := os.MkdirTemp(data, "tmp")
@@ -227,7 +292,7 @@ func main() {
 				fail("cannot write to %s", data)
 			}
 			zp := filepath.Join(tmp, "node.zip")
-			if got := download(plat.URL, zp); got != plat.SHA256 {
+			if got := download(plat.URL, zp); !shaMatches(got, plat.SHA256) {
 				fail("the downloaded Node file is damaged (checksum mismatch)")
 			}
 			x := filepath.Join(tmp, "x")
@@ -247,7 +312,7 @@ func main() {
 				fail("cannot write to %s", data)
 			}
 			tp := filepath.Join(tmp, "app.tgz")
-			if got := download(cfg.AppURL, tp); got != cfg.AppSHA256 {
+			if got := download(cfg.AppURL, tp); !shaMatches(got, cfg.AppSHA256) {
 				fail("the downloaded app file is damaged (checksum mismatch)")
 			}
 			x := filepath.Join(tmp, "x")
@@ -259,19 +324,16 @@ func main() {
 				fail("could not install the app: %v", err)
 			}
 			os.RemoveAll(tmp)
-			if olds, _ := filepath.Glob(filepath.Join(data, "app-*")); olds != nil {
-				for _, d := range olds {
-					if d != appDir {
-						os.RemoveAll(d)
-					}
-				}
-			}
+			pruneOldApps(data, appDir)
 		}
 		os.RemoveAll(lockDir)
 		lockDir = ""
+		signal.Reset()
 		say("ready.")
 	}
-	c := exec.Command(node, app)
+	// work behind corporate proxies and with the operating system's certificate store
+	os.Setenv("NODE_USE_ENV_PROXY", "1")
+	c := exec.Command(node, "--use-system-ca", app)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := c.Run(); err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {

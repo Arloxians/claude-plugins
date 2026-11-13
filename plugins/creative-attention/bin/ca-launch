@@ -16,9 +16,14 @@ else DATA="${XDG_DATA_HOME:-$HOME/.local/share}/ca-launch"; fi
 fail() {
   echo "Creative Attention could not start: $*" >&2
   echo "Check your internet connection and restart Claude. If it keeps happening, tell an Arlox admin and include this message." >&2
-  rm -rf "$LOCK" 2>/dev/null || true
   exit 1
 }
+OWN=0
+cleanup() { if [ "$OWN" = 1 ]; then rm -rf "$LOCK" 2>/dev/null || true; OWN=0; fi; }
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
 say() { echo "Creative Attention setup: $*" >&2; }
 LOCK="$DATA/install.lock"
 mkdir -p "$DATA" || fail "cannot create the folder $DATA"
@@ -45,18 +50,23 @@ APP_DIR="$DATA/app-$APP_VER-$(echo "$APP_SHA" | cut -c1-12)"
 APP="$APP_DIR/dist/server.js"
 
 if [ ! -x "$NODE" ] || [ ! -f "$APP" ]; then
-  # one install at a time: mkdir is atomic; a lock older than 20 minutes is treated as stale
+  # one install at a time: mkdir is atomic. The lock holds our PID; it is stale when that process is
+  # dead, or when it is older than 10 minutes. Waiting lasts up to 12 minutes.
   n=0
   until mkdir "$LOCK" 2>/dev/null; do
-    if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +20 2>/dev/null)" ]; then rm -rf "$LOCK"; continue; fi
-    n=$((n + 1)); [ $n -le 900 ] || fail "another setup has been running for too long"
+    holder=$(cat "$LOCK/pid" 2>/dev/null || true)
+    if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then rm -rf "$LOCK"; continue; fi
+    if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then rm -rf "$LOCK"; continue; fi
+    n=$((n + 1)); [ $n -le 720 ] || fail "another setup has been running for too long"
     [ $n -ne 1 ] || say "another Claude window is setting things up, waiting for it..."
     sleep 1
   done
+  OWN=1
+  echo $$ > "$LOCK/pid"
   if [ ! -x "$NODE" ]; then
     say "downloading Node $NODE_VER (one time, about 50 MB)..."
     TMP=$(mktemp -d "$DATA/tmp.XXXXXX") || fail "cannot write to $DATA"
-    curl -fL --retry 3 -sS "$NODE_URL" -o "$TMP/node.tgz" >&2 || fail "the Node download failed"
+    curl -fL --connect-timeout 20 --speed-time 60 --speed-limit 1024 --retry 2 -sS "$NODE_URL" -o "$TMP/node.tgz" >&2 || fail "the Node download failed"
     [ "$(sha "$TMP/node.tgz")" = "$NODE_SHA" ] || fail "the downloaded Node file is damaged (checksum mismatch)"
     mkdir "$TMP/x" && tar -xzf "$TMP/node.tgz" -C "$TMP/x" >&2 || fail "could not unpack Node"
     rm -rf "$NODE_DIR"
@@ -66,15 +76,21 @@ if [ ! -x "$NODE" ] || [ ! -f "$APP" ]; then
   if [ ! -f "$APP" ]; then
     say "downloading Creative Attention $APP_VER (one time)..."
     TMP=$(mktemp -d "$DATA/tmp.XXXXXX") || fail "cannot write to $DATA"
-    curl -fL --retry 3 -sS "$APP_URL" -o "$TMP/app.tgz" >&2 || fail "the app download failed"
+    curl -fL --connect-timeout 20 --speed-time 60 --speed-limit 1024 --retry 2 -sS "$APP_URL" -o "$TMP/app.tgz" >&2 || fail "the app download failed"
     [ "$(sha "$TMP/app.tgz")" = "$APP_SHA" ] || fail "the downloaded app file is damaged (checksum mismatch)"
     mkdir "$TMP/x" && tar -xzf "$TMP/app.tgz" -C "$TMP/x" >&2 || fail "could not unpack the app"
     rm -rf "$APP_DIR"
     mv "$TMP/x/app" "$APP_DIR" || fail "could not install the app"
     rm -rf "$TMP"
-    for d in "$DATA"/app-*; do [ "$d" = "$APP_DIR" ] || rm -rf "$d"; done
+    # keep the previous version too (a Claude window may still run it); remove anything older
+    keep=$(ls -dt "$DATA"/app-* 2>/dev/null | grep -vxF "$APP_DIR" | head -1 || true)
+    ls -dt "$DATA"/app-* 2>/dev/null | grep -vxF "$APP_DIR" | while IFS= read -r d; do
+      [ "$d" = "$keep" ] || rm -rf "$d"
+    done
   fi
-  rm -rf "$LOCK"
+  cleanup
   say "ready."
 fi
-exec "$NODE" "$APP"
+# work behind corporate proxies and with the operating system's certificate store
+export NODE_USE_ENV_PROXY=1
+exec "$NODE" --use-system-ca "$APP"
