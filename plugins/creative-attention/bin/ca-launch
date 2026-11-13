@@ -1,0 +1,80 @@
+#!/bin/sh
+# Creative Attention launcher (macOS/Linux). Downloads a pinned Node and the app (sha256 verified)
+# into the plugin data dir on first run, then runs the app with stdio passed through.
+# Windows uses ca-launch.exe (same logic, Go). Pins live in ../runtime.json.
+set -eu
+HERE=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(dirname "$HERE")
+RT="$ROOT/runtime.json"
+
+case "$(uname -s)" in Darwin) OS=darwin;; Linux) OS=linux;; *) OS=unknown;; esac
+case "$(uname -m)" in arm64|aarch64) ARCH=arm64;; x86_64|amd64) ARCH=x64;; *) ARCH=unknown;; esac
+if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then DATA="$CLAUDE_PLUGIN_DATA"
+elif [ "$OS" = darwin ]; then DATA="$HOME/Library/Application Support/ca-launch"
+else DATA="${XDG_DATA_HOME:-$HOME/.local/share}/ca-launch"; fi
+
+fail() {
+  echo "Creative Attention could not start: $*" >&2
+  echo "Check your internet connection and restart Claude. If it keeps happening, tell an Arlox admin and include this message." >&2
+  rm -rf "$LOCK" 2>/dev/null || true
+  exit 1
+}
+say() { echo "Creative Attention setup: $*" >&2; }
+LOCK="$DATA/install.lock"
+mkdir -p "$DATA" || fail "cannot create the folder $DATA"
+
+[ "$OS" != unknown ] && [ "$ARCH" != unknown ] || fail "this computer type ($(uname -s) $(uname -m)) is not supported"
+[ -f "$RT" ] || fail "the file runtime.json is missing from the plugin"
+for t in curl tar; do command -v "$t" >/dev/null 2>&1 || fail "the tool '$t' is missing on this computer"; done
+
+jstr() { sed -n "s/.*\"$1\" *: *\"\([^\"]*\)\".*/\1/p" | head -1; }
+PLAT=$(grep "\"$OS-$ARCH\"" "$RT" || true)
+[ -n "$PLAT" ] || fail "no Node build is listed for $OS-$ARCH"
+NODE_URL=$(echo "$PLAT" | jstr url)
+NODE_SHA=$(echo "$PLAT" | jstr sha256)
+NODE_VER=$(jstr node_version < "$RT")
+APP_VER=$(jstr app_version < "$RT")
+APP_URL=$(jstr app_url < "$RT")
+APP_SHA=$(jstr app_sha256 < "$RT")
+[ -n "$APP_URL" ] && [ -n "$APP_SHA" ] || fail "the plugin has no app version pinned yet"
+
+sha() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
+NODE_DIR="$DATA/node-$NODE_VER-$OS-$ARCH"
+NODE="$NODE_DIR/bin/node"
+APP_DIR="$DATA/app-$APP_VER-$(echo "$APP_SHA" | cut -c1-12)"
+APP="$APP_DIR/dist/server.js"
+
+if [ ! -x "$NODE" ] || [ ! -f "$APP" ]; then
+  # one install at a time: mkdir is atomic; a lock older than 20 minutes is treated as stale
+  n=0
+  until mkdir "$LOCK" 2>/dev/null; do
+    if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +20 2>/dev/null)" ]; then rm -rf "$LOCK"; continue; fi
+    n=$((n + 1)); [ $n -le 900 ] || fail "another setup has been running for too long"
+    [ $n -ne 1 ] || say "another Claude window is setting things up, waiting for it..."
+    sleep 1
+  done
+  if [ ! -x "$NODE" ]; then
+    say "downloading Node $NODE_VER (one time, about 50 MB)..."
+    TMP=$(mktemp -d "$DATA/tmp.XXXXXX") || fail "cannot write to $DATA"
+    curl -fL --retry 3 -sS "$NODE_URL" -o "$TMP/node.tgz" >&2 || fail "the Node download failed"
+    [ "$(sha "$TMP/node.tgz")" = "$NODE_SHA" ] || fail "the downloaded Node file is damaged (checksum mismatch)"
+    mkdir "$TMP/x" && tar -xzf "$TMP/node.tgz" -C "$TMP/x" >&2 || fail "could not unpack Node"
+    rm -rf "$NODE_DIR"
+    mv "$TMP/x/node-$NODE_VER-$OS-$ARCH" "$NODE_DIR" || fail "could not install Node"
+    rm -rf "$TMP"
+  fi
+  if [ ! -f "$APP" ]; then
+    say "downloading Creative Attention $APP_VER (one time)..."
+    TMP=$(mktemp -d "$DATA/tmp.XXXXXX") || fail "cannot write to $DATA"
+    curl -fL --retry 3 -sS "$APP_URL" -o "$TMP/app.tgz" >&2 || fail "the app download failed"
+    [ "$(sha "$TMP/app.tgz")" = "$APP_SHA" ] || fail "the downloaded app file is damaged (checksum mismatch)"
+    mkdir "$TMP/x" && tar -xzf "$TMP/app.tgz" -C "$TMP/x" >&2 || fail "could not unpack the app"
+    rm -rf "$APP_DIR"
+    mv "$TMP/x/app" "$APP_DIR" || fail "could not install the app"
+    rm -rf "$TMP"
+    for d in "$DATA"/app-*; do [ "$d" = "$APP_DIR" ] || rm -rf "$d"; done
+  fi
+  rm -rf "$LOCK"
+  say "ready."
+fi
+exec "$NODE" "$APP"

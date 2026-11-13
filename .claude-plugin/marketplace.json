@@ -1,0 +1,11 @@
+{
+  "name": "arlox",
+  "owner": { "name": "Arlox" },
+  "plugins": [
+    {
+      "name": "creative-attention",
+      "source": "./plugins/creative-attention",
+      "description": "Make and edit videos with Arlox Creative Attention. Signs in with your Arlox Google account; no setup needed."
+    }
+  ]
+}

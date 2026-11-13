@@ -1,0 +1,49 @@
+name: test
+on:
+  push: { branches: [main] }
+  pull_request:
+  workflow_dispatch:
+jobs:
+  plugin:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, macos-15-intel, windows-latest, ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Claude Code (unix)
+        if: runner.os != 'Windows'
+        run: curl -fsSL https://claude.ai/install.sh | bash && echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Install Claude Code (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          irm https://claude.ai/install.ps1 | iex
+          "$env:USERPROFILE\.local\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+      - name: Hide Node (the plugin must bring its own)
+        shell: bash
+        run: bash ci/hide-node.sh
+      - name: Validate
+        shell: bash
+        run: claude plugin validate .
+      - name: MCP initialize + tools/list through the launcher
+        shell: bash
+        run: |
+          set -eu
+          export CLAUDE_PLUGIN_DATA="$RUNNER_TEMP/direct-data"
+          cmd=plugins/creative-attention/bin/ca-launch
+          case "$OSTYPE" in msys*|cygwin*) cmd=plugins/creative-attention/bin/ca-launch.exe;; esac
+          python3 ci/mcp_check.py ca_start,ca_status,ca_run,ca_get,ca_doctor "$cmd"
+          echo "--- second start (no download)"
+          python3 ci/mcp_check.py ca_start,ca_doctor "$cmd"
+      - name: Install through Claude Code and check it connects
+        shell: bash
+        run: |
+          set -eu
+          claude --version
+          claude plugin marketplace add ./
+          claude plugin install creative-attention@arlox
+          out=$(claude mcp list 2>&1); echo "$out"
+          echo "$out" | grep -i "creative-attention" | grep -qi "connected\|✓"

@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "creative-attention": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/ca-launch"
+    }
+  }
+}

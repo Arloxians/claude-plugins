@@ -1,0 +1,64 @@
+name: build-app
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version of @arloxians/creative-attention-mcp on npm (for example 0.4.0)"
+        required: true
+permissions:
+  contents: write
+concurrency: build-app
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+      - name: Check version format
+        run: echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
+      - name: Build the app tarball (npm pack, install production dependencies only)
+        run: |
+          set -eux
+          mkdir -p work && cd work
+          npm pack "@arloxians/creative-attention-mcp@$VERSION"
+          mkdir x && tar xzf arloxians-creative-attention-mcp-"$VERSION".tgz -C x
+          mv x/package app
+          # no install scripts, no optional deps: ffmpeg and Chrome are downloaded by the app on first use
+          (cd app && npm install --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund)
+          test -f app/dist/server.js
+          tar czf "../creative-attention-app-$VERSION.tar.gz" app
+      - name: Build the Windows launcher
+        working-directory: plugins/creative-attention/launcher
+        env: { GOOS: windows, GOARCH: amd64, CGO_ENABLED: "0" }
+        run: go build -trimpath -ldflags "-s -w" -o ../bin/ca-launch.exe .
+      - name: Publish the GitHub Release asset
+        run: |
+          set -eux
+          TAG="creative-attention-v$VERSION"
+          F="creative-attention-app-$VERSION.tar.gz"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$F" --clobber
+          else
+            gh release create "$TAG" "$F" --title "Creative Attention $VERSION" --notes "App bundle for @arloxians/creative-attention-mcp $VERSION (used by the plugin launcher)."
+          fi
+      - name: Update runtime.json and plugin.json, commit to main
+        run: |
+          set -eux
+          F="creative-attention-app-$VERSION.tar.gz"
+          SHA=$(sha256sum "$F" | cut -d' ' -f1)
+          URL="https://github.com/${{ github.repository }}/releases/download/creative-attention-v$VERSION/$F"
+          python3 scripts/update-runtime.py "$VERSION" "$URL" "$SHA"
+          git config user.name "arlox-release-bot"
+          git config user.email "noreply@arlox.io"
+          git add plugins/creative-attention
+          git diff --cached --quiet || git commit -m "Change: pin Creative Attention app $VERSION"
+          git pull --rebase origin main
+          git push origin HEAD:main
