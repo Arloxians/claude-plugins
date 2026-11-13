@@ -1,6 +1,9 @@
 {
   "name": "arlox",
-  "owner": { "name": "Arlox" },
+  "owner": {
+    "name": "Arlox"
+  },
+  "description": "Arlox plugins for Claude Code",
   "plugins": [
     {
       "name": "creative-attention",
