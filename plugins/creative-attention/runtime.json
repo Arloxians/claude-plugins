@@ -7,7 +7,7 @@
     "linux-x64": { "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-x64.tar.gz", "sha256": "061ec3e3062115705b56b51fa9cc330ab50d34b6969387d4e4b1a50c6809acc2" },
     "win-x64": { "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-win-x64.zip", "sha256": "e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f" }
   },
-  "app_version": "0.4.0",
-  "app_url": "https://github.com/Arloxians/claude-plugins/releases/download/creative-attention-v0.4.0/creative-attention-app-0.4.0.tar.gz",
-  "app_sha256": "cd0b03f927557cd61477a925b470eeb25bc07e39b9c4ee5dd1fdd4115d296971"
+  "app_version": "0.5.0",
+  "app_url": "https://github.com/Arloxians/claude-plugins/releases/download/creative-attention-v0.5.0/creative-attention-app-0.5.0.tar.gz",
+  "app_sha256": "9a6998b7ec518db85374d1fa074d27ec2e59d80e30c6b8ac7ab03efe3347da34"
 }
