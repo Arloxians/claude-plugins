@@ -1,10 +1,11 @@
 #!/bin/sh
 # Creative Attention policy guard (PreToolUse hook). Same logic as `ca-launch.exe guard`.
 # Reads the hook JSON on stdin; denies image/video generation tools from other connectors.
+# Note: \u JSON escapes are read literally here (Claude Code never escapes ASCII in hook JSON), unlike the Go guard.
 # Fails closed: if ANY "tool_name" value anywhere in the input is a denied tool, deny.
-LONG="higgsfield replicate runway kling minimax hailuo ideogram midjourney leonardo stability eachlabs seedance heygen synthesia elevenlabs"
-SHORT="fal falai luma pika veo sora krea flux imagen dalle comfy comfyui wan hunyuan ltx pixverse vidu hedra recraft"
-PHRASES="gpt image|dall e|nano banana|gemini image"
+LONG="luma pika recraft seedream seededit dreamina higgsfield replicate runway kling minimax hailuo ideogram midjourney leonardo stability eachlabs seedance heygen synthesia elevenlabs"
+SHORT="fal falai veo sora krea flux imagen dalle comfy comfyui wan hunyuan ltx pixverse vidu hedra"
+PHRASES="gpt image|dall e|nano banana|gemini image|image generate|images generate|generate image|generate images|text to image|text to video"
 
 is_denied() {
   case "$1" in
@@ -18,7 +19,15 @@ is_denied() {
   done
   tokens=$(printf '%s' "$lower" | tr -c 'a-z0-9' ' ')
   for t in $tokens; do
-    base=$(printf '%s' "$t" | sed 's/[0-9]*$//')
+    base=$t
+    prev=
+    while [ "$base" != "$prev" ]; do
+      prev=$base
+      base=$(printf '%s' "$base" | sed 's/[0-9]*$//')
+      for sfx in ai labs pro fast dev turbo max lite; do
+        case "$base" in ?*"$sfx") base=${base%"$sfx"} ;; esac
+      done
+    done
     for w in $SHORT; do
       [ "$base" = "$w" ] && return 0
     done
@@ -35,6 +44,7 @@ is_denied() {
 
 names=$(grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/^"tool_name"[[:space:]]*:[[:space:]]*"\(.*\)"$/\1/')
 deny=0
+set -f
 oldifs=$IFS
 IFS='
 '

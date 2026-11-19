@@ -10,15 +10,30 @@ import (
 
 const guardReason = "Company policy: image and video generation only goes through Creative Attention (eachlabs via the Arlox router). Use the creative-attention tools instead."
 
-var guardLong = []string{"higgsfield", "replicate", "runway", "kling", "minimax", "hailuo", "ideogram", "midjourney", "leonardo", "stability", "eachlabs", "seedance", "heygen", "synthesia", "elevenlabs"}
+var guardLong = []string{"luma", "pika", "recraft", "seedream", "seededit", "dreamina", "higgsfield", "replicate", "runway", "kling", "minimax", "hailuo", "ideogram", "midjourney", "leonardo", "stability", "eachlabs", "seedance", "heygen", "synthesia", "elevenlabs"}
 var guardShort = map[string]bool{}
-var guardPhrases = []string{"gpt image", "dall e", "nano banana", "gemini image"}
+var guardPhrases = []string{"gpt image", "dall e", "nano banana", "gemini image", "image generate", "images generate", "generate image", "generate images", "text to image", "text to video"}
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
 var trailDigits = regexp.MustCompile(`[0-9]+$`)
 var anyToolName = regexp.MustCompile(`"tool_name"\s*:\s*"([^"]*)"`)
 
+var suffixes = []string{"ai", "labs", "pro", "fast", "dev", "turbo", "max", "lite"}
+
+func stripSuffixes(t string) string {
+	for prev := ""; prev != t; {
+		prev = t
+		t = trailDigits.ReplaceAllString(t, "")
+		for _, s := range suffixes {
+			if len(t) > len(s) && strings.HasSuffix(t, s) {
+				t = strings.TrimSuffix(t, s)
+			}
+		}
+	}
+	return t
+}
+
 func init() {
-	for _, w := range strings.Fields("fal falai luma pika veo sora krea flux imagen dalle comfy comfyui wan hunyuan ltx pixverse vidu hedra recraft") {
+	for _, w := range strings.Fields("fal falai veo sora krea flux imagen dalle comfy comfyui wan hunyuan ltx pixverse vidu hedra") {
 		guardShort[w] = true
 	}
 }
@@ -36,7 +51,7 @@ func guardDenies(tool string) bool {
 	}
 	toks := strings.Fields(nonAlnum.ReplaceAllString(lower, " "))
 	for _, t := range toks {
-		if guardShort[trailDigits.ReplaceAllString(t, "")] {
+		if guardShort[stripSuffixes(t)] {
 			return true
 		}
 	}

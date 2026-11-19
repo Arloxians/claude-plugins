@@ -18,6 +18,15 @@ var guardCases = []struct {
 	{"mcp__claude_ai_Slack__slack_read_file", false},
 	{"mcp__claude_ai_Notion__notion-fetch", false},
 	{"Bash", false},
+	{"mcp__lumalabs__generate", true},
+	{"mcp__pikalabs__gen", true},
+	{"mcp__x__veo3fast", true},
+	{"mcp__x__fluxpro", true},
+	{"mcp__recraftai__gen", true},
+	{"mcp__x__seedream_generate", true},
+	{"mcp__openai__images_generate", true},
+	{"mcp__claude_ai_Gmail__search_threads", false},
+	{"mcp__claude_ai_Meta_Ads__ads_get_ad_accounts", false},
 	{"mcp__veo3__generate", true},
 	{"mcp__sora2__generate", true},
 	{"mcp__falai__generate", true},
@@ -70,5 +79,18 @@ func TestGuardNested(t *testing.T) {
 		if err != nil || !strings.Contains(string(out), `"permissionDecision":"deny"`) {
 			t.Errorf("sh allowed %s (%s)", r, out)
 		}
+	}
+}
+
+func TestGuardBashFal(t *testing.T) {
+	r := `{"tool_name":"Bash","tool_input":{"command":"curl https://fal.ai/x"}}`
+	if guardInput([]byte(r)) {
+		t.Error("go denied Bash")
+	}
+	cmd := exec.Command("sh", "../bin/ca-guard")
+	cmd.Stdin = strings.NewReader(r)
+	out, _ := cmd.Output()
+	if len(out) != 0 {
+		t.Errorf("sh denied Bash: %s", out)
 	}
 }
