@@ -43,6 +43,8 @@ New versions are published here as a new plugin version. To update, run `claude 
 
 While the plugin is installed, image and video generation must go only through Creative Attention (eachlabs via the Arlox router). The plugin ships a PreToolUse hook (`hooks/hooks.json`, runs `bin/ca-guard`) that denies tools from other generation connectors (Higgsfield, fal, Replicate, Runway, eachlabs connectors and similar). On Windows the hook runs through Git Bash/sh; `ca-launch.exe guard` has the same logic for a Windows-native hook.
 
+The hook fails open on unparseable input or hook errors, and a server a user names `plugin_creative-attention_creative-attention` would share our allowed prefix; the enforcing control is managed settings (`permissions.deny`, `deniedMcpServers`).
+
 The hook only covers machines where the plugin is installed. Team Owners can also enforce it in managed settings:
 
 ```json

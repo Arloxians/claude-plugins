@@ -1,23 +1,50 @@
 #!/bin/sh
 # Creative Attention policy guard (PreToolUse hook). Same logic as `ca-launch.exe guard`.
 # Reads the hook JSON on stdin; denies image/video generation tools from other connectors.
-name=$(sed -n 's/.*"tool_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
-case "$name" in
-  mcp__plugin_creative-attention_creative-attention__*) exit 0 ;;
-  mcp__*) ;;
-  *) exit 0 ;;
-esac
-lower=$(printf '%s' "$name" | tr 'A-Z' 'a-z')
-tokens=$(printf '%s' "$lower" | tr -c 'a-z0-9' ' ')
-deny=0
-for w in higgsfield replicate runway kling minimax hailuo ideogram midjourney leonardo stability eachlabs seedance heygen synthesia elevenlabs; do
-  case "$lower" in *"$w"*) deny=1 ;; esac
-done
-for w in fal luma pika veo sora krea flux; do
-  for t in $tokens; do
-    [ "$t" = "$w" ] && deny=1
+# Fails closed: if ANY "tool_name" value anywhere in the input is a denied tool, deny.
+LONG="higgsfield replicate runway kling minimax hailuo ideogram midjourney leonardo stability eachlabs seedance heygen synthesia elevenlabs"
+SHORT="fal falai luma pika veo sora krea flux imagen dalle comfy comfyui wan hunyuan ltx pixverse vidu hedra recraft"
+PHRASES="gpt image|dall e|nano banana|gemini image"
+
+is_denied() {
+  case "$1" in
+    mcp__plugin_creative-attention_creative-attention__*) return 1 ;;
+    mcp__*) ;;
+    *) return 1 ;;
+  esac
+  lower=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
+  for w in $LONG; do
+    case "$lower" in *"$w"*) return 0 ;; esac
   done
+  tokens=$(printf '%s' "$lower" | tr -c 'a-z0-9' ' ')
+  for t in $tokens; do
+    base=$(printf '%s' "$t" | sed 's/[0-9]*$//')
+    for w in $SHORT; do
+      [ "$base" = "$w" ] && return 0
+    done
+  done
+  norm=" $(printf '%s' "$tokens" | tr -s ' ') "
+  oldifs=$IFS
+  IFS='|'
+  for p in $PHRASES; do
+    case "$norm" in *" $p "*) IFS=$oldifs; return 0 ;; esac
+  done
+  IFS=$oldifs
+  return 1
+}
+
+names=$(grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/^"tool_name"[[:space:]]*:[[:space:]]*"\(.*\)"$/\1/')
+deny=0
+oldifs=$IFS
+IFS='
+'
+for n in $names; do
+  IFS=$oldifs
+  is_denied "$n" && deny=1
+  IFS='
+'
 done
+IFS=$oldifs
 if [ "$deny" = 1 ]; then
   printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Company policy: image and video generation only goes through Creative Attention (eachlabs via the Arlox router). Use the creative-attention tools instead."}}'
 fi
