@@ -235,6 +235,9 @@ func dataDir() string {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "guard" {
+		runGuard()
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		fail("cannot locate the launcher: %v", err)

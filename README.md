@@ -39,6 +39,21 @@ In the Claude admin console, add this to server-managed settings:
 
 New versions are published here as a new plugin version. To update, run `claude plugin marketplace update arlox` then `claude plugin update creative-attention@arlox` and restart Claude Code (or ask Claude to do it).
 
+## Company policy: generation only through Creative Attention
+
+While the plugin is installed, image and video generation must go only through Creative Attention (eachlabs via the Arlox router). The plugin ships a PreToolUse hook (`hooks/hooks.json`, runs `bin/ca-guard`) that denies tools from other generation connectors (Higgsfield, fal, Replicate, Runway, eachlabs connectors and similar). On Windows the hook runs through Git Bash/sh; `ca-launch.exe guard` has the same logic for a Windows-native hook.
+
+The hook only covers machines where the plugin is installed. Team Owners can also enforce it in managed settings:
+
+```json
+{
+  "permissions": {
+    "deny": ["mcp__claude_ai_Higgsfield__*", "mcp__claude_ai_Fal__*", "mcp__claude_ai_Replicate__*"]
+  },
+  "deniedMcpServers": [{ "serverName": "eachlabs" }, { "serverUrl": "https://*.eachlabs.ai/*" }]
+}
+```
+
 ## For maintainers
 
 How it works: `.mcp.json` runs `bin/ca-launch` (POSIX sh) or `bin/ca-launch.exe` (Go, Windows). On first start the launcher downloads the pinned Node (from nodejs.org) and the app bundle (a release asset of this repo), checks sha256 against `runtime.json`, installs into the plugin data folder, and runs the app. Only one install runs at a time.
