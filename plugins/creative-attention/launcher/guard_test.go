@@ -35,6 +35,13 @@ var guardCases = []struct {
 	{"mcp__nano-banana__edit", true},
 	{"mcp__comfyui__queue_prompt", true},
 	{"mcp__claude_ai_Google_Drive__search", false},
+	{"mcp__elevenlabs__text_to_speech", true},
+	{"mcp__ElevenLabs__text_to_speech", true},
+	{"mcp__claude_ai_ElevenLabs__generate", true},
+	{"mcp__higgsfield__generate", true},
+	{"mcp__replicate__run", true},
+	{"mcp__runway__generate", true},
+	{"mcp__plugin_creative-attention_creative-attention__ca_quote", false},
 }
 
 var guardRaw = []string{
