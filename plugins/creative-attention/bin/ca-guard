@@ -9,14 +9,17 @@
 # Decision:
 #   1. names = every "tool_name" value in the input (nested ones too: fail closed).
 #   2. Every name is a Creative Attention tool -> deny only when the switch is off.
-#   3. Candidate = a non-CA tool name hit by a tool_* rule, or a `text` rule found in the lowercased
-#      input with the envelope fields removed. Not a candidate -> allow, no router lookup.
+#   3. Candidate = a non-CA tool name hit by a tool_* rule, or (only when a name is a scan tool: Bash,
+#      PowerShell, Write, Edit, MultiEdit, NotebookEdit, WebFetch) a `text` rule found in the lowercased input
+#      with the envelope, file_path and notebook_path fields removed. Not a candidate -> allow, no lookup.
 #   4. Candidate -> look up the switch (cached): off -> allow, on -> deny, unknown -> deny.
-# Rules come from guard/rules.txt (override: CA_GUARD_RULES). If that file is missing, unreadable or has
-# no rules, every non-CA mcp__ tool is a candidate and the text scan is off (Bash, Write, Edit, WebFetch
-# are then never candidates); CA tools still follow step 2.
+# Rules come from guard/rules.txt next to bin/. CA_GUARD_RULES overrides that path only when CA_GUARD_TEST=1
+# (tests). If the rules file is missing, unreadable or has no rules, the guard fails closed: every non-CA
+# mcp__ tool and every scan-tool call is a candidate; CA tools still follow step 2.
 # Always exits 0: Claude Code lets a call through when a hook fails, so denial is printed JSON only.
-# Note: \u JSON escapes are read literally here (Claude Code never escapes ASCII in hook JSON).
+# Note: \u JSON escapes are read literally here (Claude Code never escapes ASCII in hook JSON), while the Go
+# guard also decodes the top-level tool_name. Raw NUL bytes (never valid in JSON) are dropped or kept depending
+# on the shell while Go keeps them, so the two guards may disagree on input that contains NUL.
 LC_ALL=C
 export LC_ALL
 set -f
@@ -25,7 +28,7 @@ CA_PREFIX=mcp__plugin_creative-attention_creative-attention__
 ON_REASON='Company policy: for you, image, audio and video generation only goes through Creative Attention (switched on by an Arlox admin). Use the creative-attention tools instead.'
 UNKNOWN_SUFFIX=' (Your Creative Attention status could not be checked: you may not be signed in yet or the router is unreachable. Ask Claude to run ca_doctor to sign in.)'
 OFF_REASON='Creative Attention is switched off for you. Ask an Arlox admin to switch it on.'
-ENVELOPE='"(session_id|transcript_path|cwd|permission_mode|hook_event_name|tool_use_id|agent_id|agent_type|tool_name)"[[:space:]]*:[[:space:]]*"[^"]*"'
+ENVELOPE='"(session_id|transcript_path|cwd|permission_mode|hook_event_name|tool_use_id|agent_id|agent_type|tool_name|file_path|notebook_path)"[[:space:]]*:[[:space:]]*"[^"]*"'
 nl='
 '
 oifs=$IFS
@@ -36,7 +39,10 @@ deny() {
 }
 
 # --- rules -------------------------------------------------------------------------------------------
-rules=${CA_GUARD_RULES:-$(dirname "$0")/../guard/rules.txt}
+rules=$(dirname "$0")/../guard/rules.txt
+if [ "${CA_GUARD_TEST:-}" = 1 ] && [ -n "${CA_GUARD_RULES:-}" ]; then
+  rules=$CA_GUARD_RULES
+fi
 LONG= SHORT= PHRASES= TEXTS=
 nrules=0
 if [ -r "$rules" ] && [ -f "$rules" ]; then
@@ -125,12 +131,29 @@ fetch_status() {
   while :; do
     case $router in */) router=${router%/} ;; *) break ;; esac
   done
+  # https to any host; plain http only to localhost / 127.0.0.1 with an optional numeric port. No userinfo (@)
+  # and no whitespace anywhere, so http://localhost:@evil.example cannot carry the token elsewhere.
   case $router in
-    https://?*|http://127.0.0.1|http://127.0.0.1[:/]*|http://localhost|http://localhost[:/]*) ;;
+    *@*|*[[:space:]]*) echo unknown; return ;;
+    https://?*) ;;
+    http://*)
+      host=${router#http://}
+      host=${host%%/*}
+      case $host in
+        localhost|127.0.0.1) ;;
+        localhost:?*|127.0.0.1:?*)
+          case ${host#*:} in *[!0-9]*) echo unknown; return ;; esac
+          ;;
+        *) echo unknown; return ;;
+      esac
+      ;;
     *) echo unknown; return ;;
   esac
   command -v curl >/dev/null 2>&1 || { echo unknown; return; }
-  body=$(printf 'header = "Authorization: Bearer %s"\n' "$tok" | curl -fsS --max-time 3 -K - "$router/auth/cli/me" 2>/dev/null) || { echo unknown; return; }
+  # -q first: ignore ~/.curlrc. Only HTTP 200 counts (a redirect body is never trusted).
+  out=$(printf 'header = "Authorization: Bearer %s"\n' "$tok" | curl -q -fsS --max-time 3 -K - -w '\n%{http_code}' "$router/auth/cli/me" 2>/dev/null) || { echo unknown; return; }
+  [ "${out##*"$nl"}" = 200 ] || { echo unknown; return; }
+  body=${out%"$nl"*}
   if printf '%s\n' "$body" | grep -q '"creative_attention"[[:space:]]*:[[:space:]]*true'; then
     echo on
   elif printf '%s\n' "$body" | grep -q '"creative_attention"[[:space:]]*:[[:space:]]*false'; then
@@ -175,7 +198,7 @@ lookup() {
 
 # --- decision ----------------------------------------------------------------------------------------
 input=$(cat)
-names=$(printf '%s\n' "$input" | grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/^"tool_name"[[:space:]]*:[[:space:]]*"\(.*\)"$/\1/')
+names=$(printf '%s\n' "$input" | tr '\r\n' '  ' | grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/^"tool_name"[[:space:]]*:[[:space:]]*"\(.*\)"$/\1/')
 
 all_ca=0
 if [ -n "$names" ]; then
@@ -191,6 +214,14 @@ if [ "$all_ca" = 1 ]; then
   exit 0
 fi
 
+# Text scan only for tools that run commands, write files or fetch URLs.
+scan=0
+IFS=$nl
+for n in $names; do
+  case $n in Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|WebFetch) scan=1 ;; esac
+done
+IFS=$oifs
+
 cand=0
 if [ "$nrules" -gt 0 ]; then
   IFS=$nl
@@ -200,7 +231,7 @@ if [ "$nrules" -gt 0 ]; then
     IFS=$nl
   done
   IFS=$oifs
-  if [ "$cand" = 0 ]; then
+  if [ "$cand" = 0 ] && [ "$scan" = 1 ]; then
     set --
     IFS=$nl
     for p in $TEXTS; do
@@ -217,6 +248,7 @@ else
     case $n in "$CA_PREFIX"*) ;; mcp__*) cand=1 ;; esac
   done
   IFS=$oifs
+  [ "$scan" = 1 ] && cand=1
 fi
 [ "$cand" = 1 ] || exit 0
 

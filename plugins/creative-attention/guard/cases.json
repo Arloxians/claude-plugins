@@ -756,7 +756,7 @@
   "router_hits": 0
  },
  {
-  "name": "slack message mentions midjourney on",
+  "name": "slack message mentions midjourney allow",
   "input": {
    "session_id": "s1",
    "transcript_path": "/Users/x/.claude/t.jsonl",
@@ -765,13 +765,13 @@
    "hook_event_name": "PreToolUse",
    "tool_name": "mcp__claude_ai_Slack__slack_send_message",
    "tool_input": {
-    "text": "try midjourney for this"
+    "text": "try Midjourney for this"
    },
    "tool_use_id": "toolu_1"
   },
   "status": "on",
-  "expect": "deny_on",
-  "router_hits": 1
+  "expect": "allow",
+  "router_hits": 0
  },
  {
   "name": "slack plain allow",
@@ -898,6 +898,1003 @@
    },
    "tool_use_id": "toolu_1"
   },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash gemini flash image",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl -s https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent -d @req.json"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash gemini pro image",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://x/v1beta/models/gemini-3-pro-image-preview:generateContent"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash imagen generateimages",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://x/v1beta/models/m:generateImages"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash veo predictlongrunning",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://x/v1beta/models/m:predictLongRunning -d @r.json"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "write genai generate_images",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/tmp/g.py",
+    "content": "r = client.models.generate_images(model=m)"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "write genai generate_videos",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/tmp/g.py",
+    "content": "op = client.models.generate_videos(model=m)"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "write flash-image model id",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/tmp/g.ts",
+    "content": "const m = 'x-flash-image'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route pollinations.ai",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://image.pollinations.ai/prompt/cat"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route pollinations",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "npm i @pollinations/sdk"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route replicate run",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "replicate run stability-ai/sdxl prompt=cat"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route npm i replicate",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "npm i replicate"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route npm install replicate",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "npm install replicate"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route pip install replicate",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "pip install replicate"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route new replicate(",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "node -e 'const r = new Replicate({auth})'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route text_to_image(",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python3 -c 'pipe.text_to_image(p)'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route text_to_speech(",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python3 -c 'c.text_to_speech(t)'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route text_to_video(",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python3 -c 'c.text_to_video(t)'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route image_to_video(",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python3 -c 'c.image_to_video(i)'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route stabilityai/",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "huggingface-cli download stabilityai/sdxl-turbo"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route api.x.ai/v1/images",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://api.x.ai/v1/images/generations"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route recraft.ai",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://external.api.recraft.ai/v1/images"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route api.cartesia.ai",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://api.cartesia.ai/tts/bytes"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route api.play.ht",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://api.play.ht/api/v2/tts"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route texttospeech.googleapis.com",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://texttospeech.googleapis.com/v1/text:synthesize"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash route api.deepgram.com/v1/speak",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://api.deepgram.com/v1/speak?model=aura"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__openai__create_image",
+  "input": {
+   "tool_name": "mcp__openai__create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__openai__text_to_speech",
+  "input": {
+   "tool_name": "mcp__openai__text_to_speech",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__videogen__generate_video",
+  "input": {
+   "tool_name": "mcp__videogen__generate_video",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__imagegen__create",
+  "input": {
+   "tool_name": "mcp__imagegen__create",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__x__tts",
+  "input": {
+   "tool_name": "mcp__x__tts",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__x__generate_music",
+  "input": {
+   "tool_name": "mcp__x__generate_music",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__x__image_to_video",
+  "input": {
+   "tool_name": "mcp__x__image_to_video",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "write aroma diffusers allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/x/product.md",
+    "content": "Shop our aroma diffusers and candles"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "bash acmestudio.com allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://acmestudio.com/brief.pdf"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "write imagen-principal allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/x/i.html",
+    "content": "<img src=\"imagen-principal.jpg\">"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "bash cd chatterbox allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "cd ~/code/chatterbox && npm test"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "edit higgsfield file_path allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "/Users/x/higgsfield-app/src/a.ts",
+    "old_string": "a",
+    "new_string": "const a = 1"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "notebook higgsfield path allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "NotebookEdit",
+   "tool_input": {
+    "notebook_path": "/Users/x/higgsfield/n.ipynb",
+    "new_source": "x = 1"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "write coquilles allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/x/menu.md",
+    "content": "Coquilles Saint-Jacques"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "notion mentions fal.run allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__claude_ai_Notion__notion-create-pages",
+   "tool_input": {
+    "content": "compare fal.run pricing"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "webfetch fal.ai docs deny",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "WebFetch",
+   "tool_input": {
+    "url": "https://fal.ai/docs",
+    "prompt": "read"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "powershell fal deny",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "PowerShell",
+   "tool_input": {
+    "command": "Invoke-WebRequest https://fal.run/x"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced from diffusers",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python3 -c 'from diffusers import X'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced import diffusers",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python3 -c 'import diffusers'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced pip install diffusers",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "pip install diffusers"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced coqui-ai",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "git clone https://github.com/coqui-ai/TTS"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced coqui_tts",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "pip install coqui_tts"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced from kokoro",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python3 -c 'from kokoro import KPipeline'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced kokoro-onnx",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "pip install kokoro-onnx"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced pip install kokoro",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "pip install kokoro"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced chatterbox.tts",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python3 -c 'from chatterbox.tts import ChatterboxTTS'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced chatterbox-tts",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "pip install chatterbox-tts"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced imagen-4.0-",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://x/models/imagen-4.0-generate-001:predict"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced //udio.com",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "open https://udio.com/create"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced api.suno",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://api.suno.ai/x"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash replaced from bark import",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python3 -c 'from bark import generate_audio'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "redirect with off body is unknown",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://fal.run/x",
+    "description": "call fal"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "redirect_off",
+  "expect": "deny_on_unknown",
+  "router_hits": 1
+ },
+ {
+  "name": "split top-level tool_name",
+  "input": null,
+  "input_raw": "{\"tool_name\":\n\"mcp__fal__run\",\"tool_input\":{}}",
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "split nested tool_name",
+  "input": null,
+  "input_raw": "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls\"},\"x\":{\"tool_name\"\n:\n\"mcp__fal__run\"}}",
   "status": "on",
   "expect": "deny_on",
   "router_hits": 1

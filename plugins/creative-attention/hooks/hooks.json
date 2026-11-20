@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "^(mcp__.*|Bash|Write|Edit|MultiEdit|NotebookEdit|WebFetch)$",
+        "matcher": "^(mcp__.*|Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|WebFetch)$",
         "hooks": [
           { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/ca-guard\"" }
         ]

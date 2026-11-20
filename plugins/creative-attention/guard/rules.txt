@@ -4,10 +4,14 @@
 #   tool_long    substring of the lowercased MCP tool name
 #   tool_short   whole token of the tool name after suffix stripping (ai labs pro fast dev turbo max lite, trailing digits)
 #   tool_phrase  phrase matched against the space-normalised tool name tokens
-#   text         lowercased substring of the hook input (envelope fields removed)
-# If this file is missing or has no rules, the guard treats every non-Creative-Attention MCP tool as a
-# candidate and does no text scan (Bash, Write, Edit, WebFetch are then not candidates).
-# Never add bare words that hit normal code (e.g. minimax, stability, audio, udio) as text rules.
+#   text         lowercased substring of the hook input (envelope, file_path and notebook_path fields removed).
+#                Only scanned for Bash, PowerShell, Write, Edit, MultiEdit, NotebookEdit and WebFetch; other MCP
+#                tools (Slack, Notion, Gmail...) are judged by the tool_* rules alone.
+#                Trailing spaces are trimmed, so a pattern cannot end with a space.
+# If this file is missing or has no rules, the guard fails closed: every non-Creative-Attention MCP tool and
+# every Bash/PowerShell/Write/Edit/MultiEdit/NotebookEdit/WebFetch call is a candidate.
+# Never add bare words that hit normal code or prose (e.g. minimax, stability, audio, udio, diffusers, kokoro,
+# chatterbox, coqui, imagen-) as text rules: use import, install, API host or model-id forms.
 
 tool_long luma
 tool_long pika
@@ -47,6 +51,9 @@ tool_short ltx
 tool_short pixverse
 tool_short vidu
 tool_short hedra
+tool_short imagegen
+tool_short videogen
+tool_short tts
 
 tool_phrase gpt image
 tool_phrase dall e
@@ -58,6 +65,16 @@ tool_phrase generate image
 tool_phrase generate images
 tool_phrase text to image
 tool_phrase text to video
+tool_phrase create image
+tool_phrase create images
+tool_phrase generate video
+tool_phrase create video
+tool_phrase image to video
+tool_phrase text to speech
+tool_phrase generate speech
+tool_phrase generate audio
+tool_phrase generate music
+tool_phrase create speech
 
 text fal.run
 text fal.ai
@@ -75,7 +92,9 @@ text api.openai.com/v1/audio/speech
 text audio.speech.create(
 text api.openai.com/v1/videos
 text videos.create(
-text imagen-
+text imagen-3.0-
+text imagen-4.0-
+text imagen-generate
 text veo-2
 text veo-3
 text api.elevenlabs.io
@@ -109,7 +128,9 @@ text eachlabs.ai
 text api.together.xyz/v1/images
 text api.segmind.com
 text modelslab
-text diffusers
+text from diffusers
+text import diffusers
+text pip install diffusers
 text stablediffusionpipeline
 text comfyui
 text stable-diffusion-webui
@@ -117,13 +138,19 @@ text invokeai
 text mflux
 text audiocraft
 text musicgen
-text from bark
-text coqui
+text from bark import
+text coqui-ai
+text coqui_tts
 text from tts.api
-text kokoro
+text from kokoro
+text kokoro-onnx
+text kokoro_onnx
+text pip install kokoro
 text f5_tts
 text f5-tts
-text chatterbox
+text from chatterbox
+text chatterbox-tts
+text chatterbox.tts
 text xtts
 text nari-labs
 text parler_tts
@@ -136,5 +163,39 @@ text ltx-video
 text animatediff
 text stable-audio
 text riffusion
-text suno.com
-text udio.com
+text //suno.com
+text .suno.com
+text api.suno
+text //udio.com
+text .udio.com
+
+# Google Gemini / Imagen / Veo native generation
+text -flash-image
+text -pro-image
+text gemini-2.5-flash-image
+text :generateimages
+text :predictlongrunning
+text generate_images(
+text generate_videos(
+
+# More generation routes. Not listed on purpose: image_generation (the OpenAI Responses tool type; the bare word
+# is common in ordinary code and quote-delimited forms cannot be written here) and "diffusers." (it ends sentences
+# in product copy; "import diffusers" / "from diffusers" cover the library). "replicate run" has no trailing space.
+text pollinations.ai
+text pollinations
+text replicate run
+text npm i replicate
+text npm install replicate
+text pip install replicate
+text new replicate(
+text text_to_image(
+text text_to_speech(
+text text_to_video(
+text image_to_video(
+text stabilityai/
+text api.x.ai/v1/images
+text recraft.ai
+text api.cartesia.ai
+text api.play.ht
+text texttospeech.googleapis.com
+text api.deepgram.com/v1/speak

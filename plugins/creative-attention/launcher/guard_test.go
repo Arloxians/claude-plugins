@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -25,6 +26,7 @@ func TestMain(m *testing.M) {
 type guardCase struct {
 	Name       string          `json:"name"`
 	Input      json.RawMessage `json:"input"`
+	InputRaw   string          `json:"input_raw"` // exact bytes, for inputs a JSON object cannot express
 	Status     string          `json:"status"`
 	Expect     string          `json:"expect"`
 	RouterHits int             `json:"router_hits"`
@@ -71,6 +73,10 @@ func newFakeRouter(t *testing.T, status string) *fakeRouter {
 		case "on", "off":
 			w.Header().Set("content-type", "application/json")
 			w.Write([]byte(`{"email":"t@arlox.io","status":"active","creative_attention":` + map[string]string{"on": "true", "off": "false"}[status] + `}`))
+		case "redirect_off":
+			w.Header().Set("location", "/elsewhere")
+			w.WriteHeader(302)
+			w.Write([]byte(`{"creative_attention":false}`))
 		default:
 			w.WriteHeader(500)
 		}
@@ -89,14 +95,14 @@ func guardEnv(t *testing.T, routerURL string, withToken bool) (env []string, dat
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
 		switch strings.ToUpper(k) {
-		case "CA_HOME", "CLAUDE_PLUGIN_DATA", "ROUTER_URL", "CA_GUARD_RULES", "CA_GUARD_EXEC", "LOCALAPPDATA",
+		case "CA_HOME", "CLAUDE_PLUGIN_DATA", "ROUTER_URL", "CA_GUARD_RULES", "CA_GUARD_TEST", "CA_GUARD_EXEC", "LOCALAPPDATA",
 			"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY":
 			continue
 		}
 		env = append(env, kv)
 	}
 	env = append(env, "CA_HOME="+home, "CLAUDE_PLUGIN_DATA="+data, "ROUTER_URL="+routerURL,
-		"CA_GUARD_RULES="+rules, "CA_GUARD_EXEC=1", "NO_PROXY=127.0.0.1,localhost")
+		"CA_GUARD_RULES="+rules, "CA_GUARD_TEST=1", "CA_GUARD_EXEC=1", "NO_PROXY=127.0.0.1,localhost")
 	return env, data
 }
 
@@ -160,7 +166,11 @@ func TestGuardCases(t *testing.T) {
 		for _, impl := range impls {
 			r := newFakeRouter(t, c.Status)
 			env, _ := guardEnv(t, r.srv.URL, c.Status != "no_token")
-			out, took := runGuardImpl(t, impl, env, c.Input)
+			in := []byte(c.InputRaw)
+			if c.InputRaw == "" {
+				in = c.Input
+			}
+			out, took := runGuardImpl(t, impl, env, in)
 			if got := decision(t, out); got != c.Expect {
 				t.Errorf("%s [%s]: got %s want %s", c.Name, impl.name, got, c.Expect)
 			}
@@ -239,8 +249,9 @@ func TestGuardRulesMissing(t *testing.T) {
 		want string
 		hits int32
 	}{
-		{`{"tool_name":"Bash","tool_input":{"command":"curl https://fal.run/x"}}`, "allow", 0},
-		{`{"tool_name":"Write","tool_input":{"content":"import replicate"}}`, "allow", 0},
+		{`{"tool_name":"Bash","tool_input":{"command":"ls"}}`, "deny_on", 1},
+		{`{"tool_name":"Write","tool_input":{"content":"hello"}}`, "deny_on", 1},
+		{`{"tool_name":"Read","tool_input":{"file_path":"/x"}}`, "allow", 0},
 		{`{"tool_name":"mcp__claude_ai_Slack__slack_send_message","tool_input":{}}`, "deny_on", 1},
 		{`{"tool_name":"mcp__plugin_creative-attention_creative-attention__ca_run","tool_input":{}}`, "allow", 1},
 	}
@@ -257,18 +268,146 @@ func TestGuardRulesMissing(t *testing.T) {
 	}
 }
 
-func TestGuardShDefaultRulesPath(t *testing.T) {
-	// Without CA_GUARD_RULES the sh guard finds ../guard/rules.txt next to itself.
-	r := newFakeRouter(t, "on")
-	env, _ := guardEnv(t, r.srv.URL, true)
-	var clean []string
+// withoutKeys drops env entries for the given names.
+func withoutKeys(env []string, keys ...string) []string {
+	var out []string
 	for _, kv := range env {
-		if !strings.HasPrefix(kv, "CA_GUARD_RULES=") {
-			clean = append(clean, kv)
+		k, _, _ := strings.Cut(kv, "=")
+		drop := false
+		for _, d := range keys {
+			drop = drop || k == d
+		}
+		if !drop {
+			out = append(out, kv)
 		}
 	}
-	out, _ := runGuardImpl(t, guardImpl{"sh", []string{"sh", "../bin/ca-guard"}}, clean, []byte(`{"tool_name":"Bash","tool_input":{"command":"curl https://fal.run/x"}}`))
-	if got := decision(t, out); got != "deny_on" {
-		t.Errorf("sh default rules path: got %s", got)
+	return out
+}
+
+func copyFile(t *testing.T, src, dst string, mode os.FileMode) {
+	raw, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.MkdirAll(filepath.Dir(dst), 0o755)
+	if err := os.WriteFile(dst, raw, mode); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestGuardDefaultRulesAndOverrideGate: both guards find <plugin>/guard/rules.txt next to bin/, and
+// CA_GUARD_RULES is ignored unless CA_GUARD_TEST=1 (so CA_GUARD_RULES=/dev/null cannot switch rules off).
+func TestGuardDefaultRulesAndOverrideGate(t *testing.T) {
+	root := t.TempDir()
+	copyFile(t, "../guard/rules.txt", filepath.Join(root, "guard", "rules.txt"), 0o644)
+	copyFile(t, "../bin/ca-guard", filepath.Join(root, "bin", "ca-guard"), 0o755)
+	copyFile(t, os.Args[0], filepath.Join(root, "bin", "guardtest"), 0o755)
+	impls := []guardImpl{
+		{"go", []string{filepath.Join(root, "bin", "guardtest"), "-test.run=^$"}},
+		{"sh", []string{"sh", filepath.Join(root, "bin", "ca-guard")}},
+		{"bash-posix", []string{"bash", "--posix", filepath.Join(root, "bin", "ca-guard")}},
+	}
+	if _, err := exec.LookPath("dash"); err == nil {
+		impls = append(impls, guardImpl{"dash", []string{"dash", filepath.Join(root, "bin", "ca-guard")}})
+	}
+	cases := []struct {
+		in, want string
+		hits     int32
+	}{
+		{`{"tool_name":"Bash","tool_input":{"command":"curl https://fal.run/x"}}`, "deny_on", 1},
+		{`{"tool_name":"Bash","tool_input":{"command":"ls"}}`, "allow", 0},
+	}
+	for _, impl := range impls {
+		for _, override := range []string{"", "/dev/null"} {
+			for _, c := range cases {
+				r := newFakeRouter(t, "on")
+				env, _ := guardEnv(t, r.srv.URL, true)
+				env = withoutKeys(env, "CA_GUARD_RULES", "CA_GUARD_TEST")
+				if override != "" {
+					env = append(env, "CA_GUARD_RULES="+override)
+				}
+				out, _ := runGuardImpl(t, impl, env, []byte(c.in))
+				if got := decision(t, out); got != c.want || r.hits.Load() != c.hits {
+					t.Errorf("[%s] override=%q %s: got %s hits %d", impl.name, override, c.in, got, r.hits.Load())
+				}
+			}
+		}
+	}
+}
+
+// TestGuardRouterURLStrict: userinfo tricks and look-alike hosts never get the token.
+func TestGuardRouterURLStrict(t *testing.T) {
+	in := []byte(`{"tool_name":"Bash","tool_input":{"command":"curl https://fal.run/x"}}`)
+	for _, impl := range guardImpls(t) {
+		r := newFakeRouter(t, "off")
+		port := strings.TrimPrefix(r.srv.URL, "http://127.0.0.1:")
+		for _, u := range []string{
+			"http://localhost:@127.0.0.1:" + port,
+			"http://127.0.0.1:" + port + "@127.0.0.1:" + port,
+			"http://x@127.0.0.1:" + port,
+			"http://localhost.evil.example",
+			"http://127.0.0.1.evil.example:" + port,
+			"http://localhost:abc",
+			"https://u@evil.example",
+			"http://example.com",
+		} {
+			env, _ := guardEnv(t, u, true)
+			out, _ := runGuardImpl(t, impl, env, in)
+			if got := decision(t, out); got != "deny_on_unknown" {
+				t.Errorf("[%s] ROUTER_URL=%s: got %s", impl.name, u, got)
+			}
+		}
+		if h := r.hits.Load(); h != 0 {
+			t.Errorf("[%s] token sent to the router via a rejected URL (%d hits)", impl.name, h)
+		}
+		env, _ := guardEnv(t, r.srv.URL+"/", true)
+		if out, _ := runGuardImpl(t, impl, env, in); decision(t, out) != "allow" {
+			t.Errorf("[%s] valid ROUTER_URL with trailing slash refused", impl.name)
+		}
+	}
+}
+
+// TestGuardIgnoresCurlrc: a ~/.curlrc must not change the request (curl -q).
+func TestGuardIgnoresCurlrc(t *testing.T) {
+	in := []byte(`{"tool_name":"Bash","tool_input":{"command":"curl https://fal.run/x"}}`)
+	for _, impl := range guardImpls(t) {
+		r := newFakeRouter(t, "on")
+		env, _ := guardEnv(t, r.srv.URL, true)
+		home := t.TempDir()
+		os.WriteFile(filepath.Join(home, ".curlrc"), []byte("output = \"/dev/null\"\n"), 0o644)
+		env = append(withoutKeys(env, "HOME", "CURL_HOME", "XDG_CONFIG_HOME"), "HOME="+home)
+		out, _ := runGuardImpl(t, impl, env, in)
+		if got := decision(t, out); got != "deny_on" {
+			t.Errorf("[%s] with ~/.curlrc: got %s", impl.name, got)
+		}
+	}
+}
+
+// TestGuardHookMatcher: the hook covers every tool the guard scans.
+func TestGuardHookMatcher(t *testing.T) {
+	raw, err := os.ReadFile("../hooks/hooks.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var h struct {
+		Hooks struct {
+			PreToolUse []struct {
+				Matcher string `json:"matcher"`
+			}
+		}
+	}
+	if err := json.Unmarshal(raw, &h); err != nil || len(h.Hooks.PreToolUse) == 0 {
+		t.Fatalf("hooks.json: %v", err)
+	}
+	re := regexp.MustCompile(h.Hooks.PreToolUse[0].Matcher)
+	for _, n := range []string{"Bash", "Write", "Edit", "MultiEdit", "NotebookEdit", "WebFetch", "PowerShell", "mcp__fal__run"} {
+		if !re.MatchString(n) {
+			t.Errorf("matcher misses %s", n)
+		}
+	}
+	for _, n := range []string{"Read", "BashOutput", "Grep"} {
+		if re.MatchString(n) {
+			t.Errorf("matcher should not match %s", n)
+		}
 	}
 }

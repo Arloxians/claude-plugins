@@ -3,10 +3,13 @@ package main
 // Creative Attention policy guard (`ca-launch.exe guard`). Same logic as bin/ca-guard (POSIX sh); both are
 // tested against ../guard/cases.json. See bin/ca-guard for the decision steps.
 //
-// Rules come from <exe dir>/../guard/rules.txt (override: CA_GUARD_RULES). If that file is missing,
-// unreadable or has no rules, every non-CA mcp__ tool is a candidate and the text scan is off (Bash,
-// Write, Edit, WebFetch are then never candidates); CA tools still deny only when the switch is off.
-// Text handling is ASCII-only and line-bound so it matches tr/sed/grep in the sh guard exactly.
+// Rules come from <exe dir>/../guard/rules.txt; CA_GUARD_RULES overrides the path only when CA_GUARD_TEST=1.
+// If the rules file is missing, unreadable or has no rules, the guard fails closed: every non-CA mcp__ tool
+// and every scan-tool call (Bash, PowerShell, Write, Edit, MultiEdit, NotebookEdit, WebFetch) is a
+// candidate; CA tools still deny only when the switch is off. The text scan runs only for scan tools.
+// Text handling is ASCII-only and line-bound so it matches tr/sed/grep in the sh guard exactly. Tool names
+// are scanned with CR/LF turned into spaces, as the sh guard does. Raw NUL bytes (never valid JSON) are kept
+// here but may be dropped by the shell, so the two guards can disagree on input containing NUL.
 
 import (
 	"encoding/json"
@@ -34,11 +37,13 @@ var (
 	nonAlnum     = regexp.MustCompile(`[^a-z0-9]+`)
 	trailDigits  = regexp.MustCompile(`[0-9]+$`)
 	anyToolName  = regexp.MustCompile(`"tool_name"` + sp + `:` + sp + `"([^"\n]*)"`)
-	envelope     = regexp.MustCompile(`"(session_id|transcript_path|cwd|permission_mode|hook_event_name|tool_use_id|agent_id|agent_type|tool_name)"` + sp + `:` + sp + `"[^"\n]*"`)
+	envelope     = regexp.MustCompile(`"(session_id|transcript_path|cwd|permission_mode|hook_event_name|tool_use_id|agent_id|agent_type|tool_name|file_path|notebook_path)"` + sp + `:` + sp + `"[^"\n]*"`)
 	authToken    = regexp.MustCompile(`"token"` + sp + `:` + sp + `"(arx_[A-Za-z0-9_-]+)"`)
 	switchOn     = regexp.MustCompile(`"creative_attention"` + sp + `:` + sp + `true`)
 	switchOff    = regexp.MustCompile(`"creative_attention"` + sp + `:` + sp + `false`)
 	cacheDigits  = regexp.MustCompile(`^[0-9]{1,14}$`)
+	httpLocal    = regexp.MustCompile(`^http://(localhost|127\.0\.0\.1)(:[0-9]+)?(/.*)?$`)
+	scanTools    = map[string]bool{"Bash": true, "PowerShell": true, "Write": true, "Edit": true, "MultiEdit": true, "NotebookEdit": true, "WebFetch": true}
 	guardSuffix  = []string{"ai", "labs", "pro", "fast", "dev", "turbo", "max", "lite"}
 	guardTimeout = 3 * time.Second
 )
@@ -88,7 +93,7 @@ func loadGuardRules(path string) guardRules {
 }
 
 func guardRulesPath() string {
-	if p := os.Getenv("CA_GUARD_RULES"); p != "" {
+	if p := os.Getenv("CA_GUARD_RULES"); p != "" && os.Getenv("CA_GUARD_TEST") == "1" {
 		return p
 	}
 	exe, err := os.Executable()
@@ -146,7 +151,8 @@ func (r guardRules) toolDenied(tool string) bool {
 // guardNames returns every non-empty "tool_name" value (nested too), plus the JSON-decoded top-level one.
 func guardNames(in []byte) []string {
 	var names []string
-	for _, m := range anyToolName.FindAllSubmatch(in, -1) {
+	joined := []byte(strings.NewReplacer("\r", " ", "\n", " ").Replace(string(in)))
+	for _, m := range anyToolName.FindAllSubmatch(joined, -1) {
 		if len(m[1]) > 0 {
 			names = append(names, string(m[1]))
 		}
@@ -175,6 +181,10 @@ func guardDecide(in []byte, r guardRules, lookup func() string) string {
 		}
 		return ""
 	}
+	scan := false
+	for _, n := range names {
+		scan = scan || scanTools[n]
+	}
 	cand := false
 	if r.n > 0 {
 		for _, n := range names {
@@ -183,7 +193,7 @@ func guardDecide(in []byte, r guardRules, lookup func() string) string {
 				break
 			}
 		}
-		if !cand && len(r.text) > 0 {
+		if !cand && scan && len(r.text) > 0 {
 			text := envelope.ReplaceAllString(asciiLower(string(in)), "")
 			for _, p := range r.text {
 				if strings.Contains(text, p) {
@@ -198,6 +208,7 @@ func guardDecide(in []byte, r guardRules, lookup func() string) string {
 				cand = true
 			}
 		}
+		cand = cand || scan
 	}
 	if !cand {
 		return ""
@@ -226,16 +237,13 @@ func caHome() string {
 	return filepath.Join(h, ".creative-attention")
 }
 
+// routerAllowed: https to any host; plain http only to localhost / 127.0.0.1 with an optional numeric port.
+// No userinfo (@) and no whitespace, so http://localhost:@evil.example cannot carry the token elsewhere.
 func routerAllowed(u string) bool {
-	if strings.HasPrefix(u, "https://") && len(u) > len("https://") {
-		return true
+	if strings.ContainsAny(u, "@ \t\n\v\f\r") {
+		return false
 	}
-	for _, h := range []string{"http://127.0.0.1", "http://localhost"} {
-		if u == h || strings.HasPrefix(u, h+":") || strings.HasPrefix(u, h+"/") {
-			return true
-		}
-	}
-	return false
+	return (strings.HasPrefix(u, "https://") && len(u) > len("https://")) || httpLocal.MatchString(u)
 }
 
 // fetchStatus asks the router for the switch: on | off | unknown.
@@ -272,7 +280,7 @@ func fetchStatus(home string) string {
 		return "unknown"
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode >= 400 { // curl -f
+	if resp.StatusCode != http.StatusOK { // a redirect body is never trusted
 		return "unknown"
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
