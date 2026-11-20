@@ -15,4 +15,4 @@ Explain this to the user in simple, friendly words. Do not assume they are techn
 
 When helping the user, avoid jargon, say what you are about to do before long steps, and tell them when a step may take a few minutes.
 
-**Company policy:** while this plugin is installed, image and video generation must go only through Creative Attention (eachlabs via the Arlox router). Do not use any other generation connector, including other eachlabs connectors; a guard blocks them. If asked, use the creative-attention tools instead.
+**Company policy:** an Arlox admin turns Creative Attention on or off for each teammate. When it is on, make images, audio and video only through Creative Attention, because a guard blocks other tools that make them. When it is off, Creative Attention's tools will not work for you, and other tools are allowed; ask an Arlox admin if you need it switched on.

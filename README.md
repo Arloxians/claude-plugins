@@ -40,13 +40,25 @@ In the Claude admin console, add this to server-managed settings:
 
 New versions are published here as a new plugin version. With the team settings above (`"autoUpdate": true`), Claude Code picks up a new version by itself: within about ten minutes of the first message in a session it checks this repo and installs the update, then asks you to run `/reload-plugins` (or restart). Auto-update only fires when the plugin's version number changes. Individual installs can turn it on in `/plugin` → Marketplaces → arlox, or update by hand: `claude plugin marketplace update arlox` then `claude plugin update creative-attention@arlox`, and restart Claude Code.
 
-## Company policy: generation only through Creative Attention
+## Company policy: Creative Attention on or off per teammate
 
-While the plugin is installed, image and video generation must go only through Creative Attention (eachlabs via the Arlox router). The plugin ships a PreToolUse hook (`hooks/hooks.json`, runs `bin/ca-guard`) that denies tools from other generation connectors (Higgsfield, fal, Replicate, Runway, eachlabs connectors and similar). On Windows the hook runs through Git Bash/sh; `ca-launch.exe guard` has the same logic for a Windows-native hook.
+An Arlox admin switches Creative Attention on or off for each teammate, in the router admin (People page). New teammates start off.
 
-The hook fails open on unparseable input or hook errors, and a server a user names `plugin_creative-attention_creative-attention` would share our allowed prefix; the enforcing control is managed settings (`permissions.deny`, `deniedMcpServers`).
+- **On:** image, audio and video generation must go only through Creative Attention (eachlabs via the Arlox router). In Claude Code, the plugin's guard hook (`hooks/hooks.json`, runs `bin/ca-guard`) blocks other ways to make them. It blocks other generator connectors (by tool name). It also blocks shell commands, file writes and edits, notebook edits, web fetches, and code-runner or file-writer tools when their content calls a generation API, SDK or local generation model. Local editing (ffmpeg, ImageMagick) stays allowed.
+- **Off:** anything is allowed except Creative Attention's own tools. The router refuses those too.
 
-The hook only covers machines where the plugin is installed. Team Owners can also enforce it in managed settings:
+If the status cannot be checked (not signed in yet, offline, or the router is unreachable), the guard treats the teammate as on. Signing in through Creative Attention fixes it: ask Claude to run `ca_doctor`.
+
+A status change reaches a PC within about 2 minutes. An "on" result is cached for up to 120 seconds. An "off" result is never cached.
+
+Accepted limits:
+
+- A teammate who removes or disables the plugin escapes the guard.
+- On Windows, install Git for Windows. Without it, hooks run in PowerShell, and the sh guard cannot run there.
+- The guard is a blocklist. A brand-new provider is allowed until someone adds it to `guard/rules.txt`.
+- A server named `plugin_creative-attention_creative-attention` would share our allowed prefix, so its tools would pass the guard when the switch is on. The managed settings below are the stronger control for this.
+
+The guard only covers machines where the plugin is installed. Team Owners can also add this optional extra lock in managed settings. It blocks the listed connectors on every machine, whatever the teammate's switch says:
 
 ```json
 {
@@ -62,3 +74,15 @@ The hook only covers machines where the plugin is installed. Team Owners can als
 How it works: `.mcp.json` runs `bin/ca-launch` (POSIX sh) or `bin/ca-launch.exe` (Go, Windows). On first start the launcher downloads the pinned Node (from nodejs.org) and the app bundle (a release asset of this repo), checks sha256 against `runtime.json`, installs into the plugin data folder, and runs the app. Only one install runs at a time.
 
 Release a new app version after publishing it to npm: run the `build-app` workflow with the version (for example `0.4.0`). It packs the npm package, installs production dependencies, uploads release `creative-attention-v<version>`, rebuilds `ca-launch.exe`, updates `runtime.json` and the plugin version, and commits to main. The `test` workflow then checks all five platforms with Node hidden.
+
+### Maintaining the guard
+
+The guard is `bin/ca-guard` (POSIX sh). The same logic is in `launcher/guard.go` (`ca-launch.exe guard`). Both read the list of generators from `guard/rules.txt`, one rule per line in the form `<kind> <pattern>`. The kinds are `tool_long`, `tool_short`, `tool_phrase` and `text`. The comment at the top of that file explains each one. Patterns are lowercase.
+
+Test cases are in `guard/cases.json`. The Go tests run every case against the sh guard (sh and bash in POSIX mode, and dash when it is installed) and against the Go guard.
+
+To block a newly found generator:
+
+1. Add one line to `guard/rules.txt`.
+2. Add one case to `guard/cases.json`.
+3. Run `cd plugins/creative-attention/launcher && go test ./...`. It must pass before you commit.
