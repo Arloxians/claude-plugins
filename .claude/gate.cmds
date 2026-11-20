@@ -1,0 +1,5 @@
+[always]
+sh -n plugins/creative-attention/bin/ca-guard
+claude plugin validate .
+[full]
+cd plugins/creative-attention/launcher && go vet ./... && go test ./...

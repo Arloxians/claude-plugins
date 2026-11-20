@@ -1,0 +1,5 @@
+plugins/creative-attention/** => cd plugins/creative-attention/launcher && go vet ./... && go test ./...
+README.md => true
+scripts/** => true
+.github/** => true
+.claude/** => true
