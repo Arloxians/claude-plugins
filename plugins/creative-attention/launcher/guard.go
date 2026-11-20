@@ -8,7 +8,7 @@ package main
 // and every scan-tool call (Bash, PowerShell, Write, Edit, MultiEdit, NotebookEdit, WebFetch) is a
 // candidate; CA tools still deny only when the switch is off. The text scan runs only for scan tools
 // (the fixed list plus MCP code runners / file writers, see scanTool). More than 200 tool_name values is a
-// candidate without further analysis. Only "on" and "unknown" are cached; "off" is asked every time.
+// candidate without further analysis, and so is any tool_name over 256 bytes (never word or camelCase split). Only "on" and "unknown" are cached; "off" is asked every time.
 // Text handling is ASCII-only and line-bound so it matches tr/sed/grep in the sh guard exactly. Tool names
 // are scanned with CR/LF turned into spaces, as the sh guard does. Raw NUL bytes (never valid JSON) are kept
 // here but may be dropped by the shell, so the two guards can disagree on input containing NUL.
@@ -38,6 +38,9 @@ const sp = `[\t\v\f\r ]*`
 // guardMaxNames: more tool_name values than this is a candidate without further analysis.
 const guardMaxNames = 200
 
+// guardMaxNameLen: a tool_name longer than this is a candidate without word or camelCase splitting.
+const guardMaxNameLen = 256
+
 var (
 	nonAlnum     = regexp.MustCompile(`[^a-z0-9]+`)
 	trailDigits  = regexp.MustCompile(`[0-9]+$`)
@@ -56,8 +59,9 @@ var (
 )
 
 type guardRules struct {
-	long, short, phrase, text []string
-	n                         int
+	long, short, phrase, guardedPhrase, text []string
+	except                                   map[string]bool
+	n                                        int
 }
 
 func asciiLower(s string) string {
@@ -86,6 +90,15 @@ func loadGuardRules(path string) guardRules {
 			dst, pat = &r.short, p
 		} else if p, ok := strings.CutPrefix(line, "tool_phrase "); ok {
 			dst, pat = &r.phrase, p
+		} else if p, ok := strings.CutPrefix(line, "tool_phrase_guarded "); ok {
+			dst, pat = &r.guardedPhrase, p
+		} else if p, ok := strings.CutPrefix(line, "tool_except "); ok {
+			if r.except == nil {
+				r.except = map[string]bool{}
+			}
+			r.except[p] = true
+			r.n++
+			continue
 		} else if p, ok := strings.CutPrefix(line, "text "); ok {
 			dst, pat = &r.text, p
 		} else {
@@ -137,7 +150,29 @@ func (r guardRules) toolDenied(tool string) bool {
 			return true
 		}
 	}
-	return r.tokensDenied(lower) || r.tokensDenied(asciiLower(camel(tool)))
+	c := asciiLower(camel(tool))
+	return r.tokensDenied(lower) || r.tokensDenied(c) || r.guardedDenied(lower, c)
+}
+
+// guardedDenied: a tool_phrase_guarded phrase in either token form, unless a tool_except token is present.
+func (r guardRules) guardedDenied(lower, split string) bool {
+	if len(r.guardedPhrase) == 0 {
+		return false
+	}
+	a := strings.Fields(nonAlnum.ReplaceAllString(lower, " "))
+	b := strings.Fields(nonAlnum.ReplaceAllString(split, " "))
+	for _, t := range append(append([]string{}, a...), b...) {
+		if r.except[t] {
+			return false
+		}
+	}
+	na, nb := " "+strings.Join(a, " ")+" ", " "+strings.Join(b, " ")+" "
+	for _, p := range r.guardedPhrase {
+		if strings.Contains(na, " "+p+" ") || strings.Contains(nb, " "+p+" ") {
+			return true
+		}
+	}
+	return false
 }
 
 // camel inserts _ between a lowercase letter or digit and an uppercase letter (generateImage -> generate_Image).
@@ -209,6 +244,11 @@ func guardDecide(in []byte, r guardRules, lookup func() string) string {
 	names, count := guardNames(in)
 	if count > guardMaxNames {
 		return guardVerdict(lookup())
+	}
+	for _, n := range names {
+		if len(n) > guardMaxNameLen {
+			return guardVerdict(lookup())
+		}
 	}
 	allCA := len(names) > 0
 	for _, n := range names {

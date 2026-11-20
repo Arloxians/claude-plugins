@@ -1864,7 +1864,7 @@
   "router_hits": 1
  },
  {
-  "name": "bash writes policy-cache",
+  "name": "bash writes policy-cache allow (off is never trusted)",
   "input": {
    "session_id": "s1",
    "transcript_path": "/Users/x/.claude/t.jsonl",
@@ -1878,8 +1878,8 @@
    "tool_use_id": "toolu_1"
   },
   "status": "on",
-  "expect": "deny_on",
-  "router_hits": 1
+  "expect": "allow",
+  "router_hits": 0
  },
  {
   "name": "write script touching policy-cache",
@@ -1897,8 +1897,8 @@
    "tool_use_id": "toolu_1"
   },
   "status": "on",
-  "expect": "deny_on",
-  "router_hits": 1
+  "expect": "allow",
+  "router_hits": 0
  },
  {
   "name": "bash replicate runtime allow",
@@ -2617,6 +2617,370 @@
   },
   "status": "off",
   "expect": "allow",
+  "router_hits": 1
+ },
+ {
+  "name": "300-byte nested name on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "ls",
+    "x": {
+     "tool_name": "mcp__x__aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "300-byte nested name off",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "ls",
+    "x": {
+     "tool_name": "mcp__x__aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "off",
+  "expect": "allow",
+  "router_hits": 1
+ },
+ {
+  "name": "256-byte name is analysed",
+  "input": {
+   "tool_name": "mcp__x__aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "ffmpeg images/edits path allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "ffmpeg -i in.mp4 assets/images/edits/f%03d.png"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "ls images/variations allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "ls ./images/variations/"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "write_file images/edits src allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__filesystem__write_file",
+   "tool_input": {
+    "path": "/x/a.html",
+    "content": "img src=/images/edits/hero.png"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "write seedream notes allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/x/f.txt",
+    "content": "Compare Seedream 4 vs our CA output"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "bash seedance shot allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "echo \"Shot 4: seedance style motion\""
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "curl ai-image-generation blog allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://example.com/blog/ai-image-generation-tips"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "bash gemini exp image generation",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://x/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "write seedream_ model id",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/x/f.txt",
+    "content": "model = 'seedream_v4'"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "rg policy-cache allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "rg policy-cache plugins/"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "tool mcp__gemini__create_image",
+  "input": {
+   "tool_name": "mcp__gemini__create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__huggingface__create_image",
+  "input": {
+   "tool_name": "mcp__huggingface__create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__openrouter__create_image",
+  "input": {
+   "tool_name": "mcp__openrouter__create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__together__create_image",
+  "input": {
+   "tool_name": "mcp__together__create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__nanobanana__create_image",
+  "input": {
+   "tool_name": "mcp__nanobanana__create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__openai_image__create_image",
+  "input": {
+   "tool_name": "mcp__openai_image__create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__x__create_images",
+  "input": {
+   "tool_name": "mcp__x__create_images",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__x__createVideo",
+  "input": {
+   "tool_name": "mcp__x__createVideo",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__gcp__compute_create_image allow",
+  "input": {
+   "tool_name": "mcp__gcp__compute_create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "tool mcp__x__createImageSnapshot allow",
+  "input": {
+   "tool_name": "mcp__x__createImageSnapshot",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "tool mcp__vimeo__create_video allow",
+  "input": {
+   "tool_name": "mcp__vimeo__create_video",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "bash pip install pollinations",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "pip install pollinations"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "write import pollinations",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/x/f.txt",
+    "content": "import pollinations\n"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
   "router_hits": 1
  }
 ]

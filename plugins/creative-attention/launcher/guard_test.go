@@ -258,6 +258,53 @@ func TestGuardCacheStrict(t *testing.T) {
 	}
 }
 
+// TestGuardLongName: a ~1 MB tool_name is a candidate at once (no word or camelCase splitting) and stays fast.
+func TestGuardLongName(t *testing.T) {
+	in, _ := json.Marshal(map[string]any{"tool_name": "Bash", "tool_input": map[string]any{"command": "ls"},
+		"x": map[string]string{"tool_name": "mcp__x__" + strings.Repeat("aB", 500000)}})
+	for _, impl := range guardImpls(t) {
+		for status, want := range map[string]string{"on": "deny_on", "off": "allow", "unknown": "deny_on_unknown"} {
+			r := newFakeRouter(t, status)
+			env, _ := guardEnv(t, r.srv.URL, true)
+			out, took := runGuardImpl(t, impl, env, in)
+			t.Logf("[%s] 1 MB nested name, %s: %s in %v", impl.name, status, decision(t, out), took)
+			if got := decision(t, out); got != want || took > time.Second {
+				t.Errorf("[%s] 1 MB name %s: got %s in %v (want %s < 1s)", impl.name, status, got, took, want)
+			}
+		}
+	}
+}
+
+// TestGuardAwkFailure: with a broken awk the sh guard still allows an ON user's own CA tools and fails closed
+// on everything else.
+func TestGuardAwkFailure(t *testing.T) {
+	bin := t.TempDir()
+	for _, tool := range []string{"tr", "grep", "sed", "head", "curl", "date", "dirname", "mkdir", "mv", "rm", "cat"} {
+		p, err := exec.LookPath(tool)
+		if err != nil {
+			t.Fatalf("%s: %v", tool, err)
+		}
+		os.Symlink(p, filepath.Join(bin, tool))
+	}
+	os.WriteFile(filepath.Join(bin, "awk"), []byte("#!/bin/sh\nexit 2\n"), 0o755)
+	cases := []struct{ in, want string }{
+		{`{"tool_name":"mcp__plugin_creative-attention_creative-attention__ca_run","tool_input":{}}`, "allow"},
+		{`{"tool_name":"Bash","tool_input":{"command":"ls"}}`, "deny_on"},
+		{`{"tool_name":"mcp__claude_ai_Slack__slack_send_message","tool_input":{}}`, "deny_on"},
+	}
+	for _, impl := range guardImpls(t)[1:] {
+		for _, c := range cases {
+			r := newFakeRouter(t, "on")
+			env, _ := guardEnv(t, r.srv.URL, true)
+			env = append(withoutKeys(env, "PATH"), "PATH="+bin)
+			out, _ := runGuardImpl(t, impl, env, []byte(c.in))
+			if got := decision(t, out); got != c.want {
+				t.Errorf("[%s] awk broken, %s: got %s want %s", impl.name, c.in, got, c.want)
+			}
+		}
+	}
+}
+
 // TestGuardLargeInputs: many nested names fail closed fast; a big single-line Write stays quick.
 func TestGuardLargeInputs(t *testing.T) {
 	var b strings.Builder

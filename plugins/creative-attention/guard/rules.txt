@@ -5,6 +5,9 @@
 #   tool_short   whole token of the tool name after suffix stripping (ai labs pro fast dev turbo max lite, trailing digits);
 #                tokens come from the name as is and from the name with camelCase split (generateImage -> generate image)
 #   tool_phrase  phrase matched against the space-normalised tool name tokens
+#   tool_phrase_guarded  like tool_phrase, but ignored when any whole token of the tool name (as is or camelCase
+#                split, no suffix stripping) is a tool_except token
+#   tool_except  token that exempts a tool from the tool_phrase_guarded rules (never from the other rules)
 #   text         lowercased substring of the hook input (envelope, file_path and notebook_path fields removed).
 #                Only scanned for Bash, PowerShell, Write, Edit, MultiEdit, NotebookEdit and WebFetch; other MCP
 #                tools (Slack, Notion, Gmail...) are judged by the tool_* rules alone.
@@ -79,7 +82,27 @@ tool_phrase generate music
 tool_phrase create speech
 tool_phrase synthesize speech
 tool_phrase images generations
-tool_phrase openai create image
+
+# Generic create-* tools: a guarded phrase denies unless a tool_except token is also in the tool name
+# (infrastructure tools such as mcp__aws__ec2_create_image or mcp__mux__create_video_assets).
+tool_phrase_guarded create image
+tool_phrase_guarded create images
+tool_phrase_guarded create video
+tool_except ec2
+tool_except ami
+tool_except docker
+tool_except container
+tool_except compute
+tool_except gcp
+tool_except aws
+tool_except azure
+tool_except vm
+tool_except snapshot
+tool_except asset
+tool_except assets
+tool_except mux
+tool_except vimeo
+tool_except registry
 
 text fal.run
 text fal.ai
@@ -187,8 +210,12 @@ text generate_videos(
 # More generation routes. Not listed on purpose: image_generation (the OpenAI Responses tool type; the bare word
 # is common in ordinary code and quote-delimited forms cannot be written here), "diffusers." (it ends sentences
 # in product copy; "import diffusers" / "from diffusers" cover the library), "replicate run" (hits "replicate
-# runtime"), "pollinations" (prose), "-flash-image" / "-pro-image" (CSS class names; model-id forms are used).
+# runtime"), "pollinations" (prose), "-flash-image" / "-pro-image" (CSS class names; model-id forms are used),
+# "policy-cache" (no value since off is never cached; blocked editing the guard), bare "/images/edits",
+# "seedream", "seedance", "-image-generation", "image-synthesis" (paths, notes and blog URLs).
 text pollinations.ai
+text pip install pollinations
+text import pollinations
 text npm i replicate
 text npm install replicate
 text pip install replicate
@@ -206,11 +233,11 @@ text texttospeech.googleapis.com
 text api.deepgram.com/v1/speak
 
 # Round 3: the guard's own cache, OpenAI-compatible image endpoints, cloud model ids, local pipelines.
-text policy-cache
 text /images/generations
-text /images/edits
-text /images/variations
-text -image-generation
+text v1/images/edits
+text v1/images/variations
+text -preview-image-generation
+text -exp-image-generation
 text imagegeneration@
 text gpt-image-
 text dall-e-
@@ -223,7 +250,10 @@ text txt2img
 text text2image
 text text2video
 text img2img
-text image-synthesis
-text seedream
-text seedance
+text /image-synthesis
+text seedream-
+text seedream_
+text doubao-seedream
+text seedance-1
+text doubao-seedance
 text wavespeed.ai

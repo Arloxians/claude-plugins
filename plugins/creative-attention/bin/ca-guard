@@ -14,7 +14,8 @@
 #      file_path and notebook_path fields removed. Scan tools: Bash, PowerShell, Write, Edit, MultiEdit,
 #      NotebookEdit, WebFetch, and non-CA MCP tools whose last name segment (camelCase split, lowercased,
 #      - as _) contains execute_code, execute_command, run_command, start_process, run_code, write_file,
-#      edit_file or create_file. More than 200 tool_name values -> candidate without further analysis.
+#      edit_file or create_file. More than 200 tool_name values, or any value over 256 bytes -> candidate
+#      without further analysis.
 #      Not a candidate -> allow, no router lookup.
 #   4. Candidate -> look up the switch: off -> allow, on -> deny, unknown -> deny. Only "on" and "unknown"
 #      are cached ("off" is never cached or trusted from the cache, so a forged cache cannot switch it off).
@@ -58,7 +59,7 @@ if [ -r "$rules" ] && [ -f "$rules" ]; then
   while IFS= read -r line; do
     line=${line%"${line##*[! 	]}"}
     case $line in
-      "tool_long "*|"tool_short "*|"tool_phrase "*) ;;
+      "tool_long "*|"tool_short "*|"tool_phrase "*|"tool_phrase_guarded "*|"tool_except "*) ;;
       "text "*) TEXTS=$TEXTS${line#text }$nl ;;
       *) continue ;;
     esac
@@ -88,14 +89,14 @@ END { print hit + 0 }'
 # One awk pass over all names (GUARD_NAMES, newline-separated) with the tool_* rules read from the rules file.
 # Prints "<all_ca> <scan> <denied>" as 0/1 flags. Mirrors guardDecide/toolDenied/scanTool in launcher/guard.go.
 NAMES_AWK='
-function camel(s,   o, i, c, p) {
-  o = ""; p = ""
-  for (i = 1; i <= length(s); i++) {
+function camel(s,   o, i, n, c, p, start) {
+  o = ""; p = ""; start = 1; n = length(s)
+  for (i = 1; i <= n; i++) {
     c = substr(s, i, 1)
-    if (c ~ /[A-Z]/ && p ~ /[a-z0-9]/) o = o "_"
-    o = o c; p = c
+    if (c ~ /[A-Z]/ && p ~ /[a-z0-9]/) { o = o substr(s, start, i - start) "_"; start = i }
+    p = c
   }
-  return o
+  return o substr(s, start)
 }
 function strip(t,   prev, k, x) {
   prev = ""
@@ -120,11 +121,23 @@ function toks(l,   n, a, i, j, norm) {
   for (j = 1; j <= np; j++) if (index(norm, " " PH[j] " ")) return 1
   return 0
 }
-function denied(n,   lower, i) {
+function guarded(a, b,   na, nb, A, B, i, j) {
+  if (!ngp) return 0
+  gsub(/[^a-z0-9]+/, " ", a)
+  gsub(/[^a-z0-9]+/, " ", b)
+  na = split(a, A, " ")
+  nb = split(b, B, " ")
+  for (i = 1; i <= na; i++) if (A[i] in EXC) return 0
+  for (i = 1; i <= nb; i++) if (B[i] in EXC) return 0
+  for (j = 1; j <= ngp; j++) if (index(" " a " ", " " GP[j] " ") || index(" " b " ", " " GP[j] " ")) return 1
+  return 0
+}
+function denied(n,   lower, c, i) {
   if (index(n, CAP) == 1 || index(n, "mcp__") != 1) return 0
   lower = tolower(n)
   for (i = 1; i <= nlong; i++) if (index(lower, LONG[i])) return 1
-  return toks(lower) || toks(tolower(camel(n)))
+  c = tolower(camel(n))
+  return toks(lower) || toks(c) || guarded(lower, c)
 }
 function scantool(n,   seg, i) {
   if (n in SCANSET) return 1
@@ -149,6 +162,8 @@ BEGIN {
   if (index($0, "tool_long ") == 1) LONG[++nlong] = substr($0, 11)
   else if (index($0, "tool_short ") == 1) SHORT[substr($0, 12)]
   else if (index($0, "tool_phrase ") == 1) PH[++np] = substr($0, 13)
+  else if (index($0, "tool_phrase_guarded ") == 1) GP[++ngp] = substr($0, 21)
+  else if (index($0, "tool_except ") == 1) EXC[substr($0, 13)]
 }
 END {
   nn = split(ENVIRON["GUARD_NAMES"], N, "\n")
@@ -266,13 +281,16 @@ input=$(cat)
 # further analysis (fail closed, bounded work).
 names=$(printf '%s\n' "$input" | tr '\r\n' '  ' | grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"][^"]*"' | head -n 201 | sed 's/^"tool_name"[[:space:]]*:[[:space:]]*"\(.*\)"$/\1/')
 count=0
+long=0
 IFS=$nl
 for n in $names; do
   count=$((count + 1))
+  [ "${#n}" -gt 256 ] && long=1
 done
 IFS=$oifs
 
-if [ "$count" -gt 200 ]; then
+# More than 200 names, or any name over 256 bytes: candidate without further analysis (no word splitting).
+if [ "$count" -gt 200 ] || [ "$long" = 1 ]; then
   cand=1
 else
   rfile=$rules
@@ -280,7 +298,19 @@ else
   flags=$(GUARD_NAMES=$names awk "$NAMES_AWK" "$rfile" 2>/dev/null)
   case $flags in
     [01]" "[01]" "[01]) ;;
-    *) flags="0 1 1" ;; # awk failed: fail closed
+    *)
+      # awk failed: fail closed (scan + denied), but still let only-CA calls follow the switch.
+      all_ca=0
+      if [ -n "$names" ]; then
+        all_ca=1
+        IFS=$nl
+        for n in $names; do
+          case $n in "$CA_PREFIX"*) ;; *) all_ca=0 ;; esac
+        done
+        IFS=$oifs
+      fi
+      flags="$all_ca 1 1"
+      ;;
   esac
   all_ca=${flags%% *}
   scan=${flags#* }
