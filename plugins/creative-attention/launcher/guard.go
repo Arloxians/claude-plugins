@@ -6,7 +6,9 @@ package main
 // Rules come from <exe dir>/../guard/rules.txt; CA_GUARD_RULES overrides the path only when CA_GUARD_TEST=1.
 // If the rules file is missing, unreadable or has no rules, the guard fails closed: every non-CA mcp__ tool
 // and every scan-tool call (Bash, PowerShell, Write, Edit, MultiEdit, NotebookEdit, WebFetch) is a
-// candidate; CA tools still deny only when the switch is off. The text scan runs only for scan tools.
+// candidate; CA tools still deny only when the switch is off. The text scan runs only for scan tools
+// (the fixed list plus MCP code runners / file writers, see scanTool). More than 200 tool_name values is a
+// candidate without further analysis. Only "on" and "unknown" are cached; "off" is asked every time.
 // Text handling is ASCII-only and line-bound so it matches tr/sed/grep in the sh guard exactly. Tool names
 // are scanned with CR/LF turned into spaces, as the sh guard does. Raw NUL bytes (never valid JSON) are kept
 // here but may be dropped by the shell, so the two guards can disagree on input containing NUL.
@@ -33,15 +35,20 @@ const (
 // sp is [[:space:]] without newline: sed and grep in the sh guard work per line.
 const sp = `[\t\v\f\r ]*`
 
+// guardMaxNames: more tool_name values than this is a candidate without further analysis.
+const guardMaxNames = 200
+
 var (
 	nonAlnum     = regexp.MustCompile(`[^a-z0-9]+`)
 	trailDigits  = regexp.MustCompile(`[0-9]+$`)
-	anyToolName  = regexp.MustCompile(`"tool_name"` + sp + `:` + sp + `"([^"\n]*)"`)
+	anyToolName  = regexp.MustCompile(`"tool_name"` + sp + `:` + sp + `"([^"\n]+)"`)
 	envelope     = regexp.MustCompile(`"(session_id|transcript_path|cwd|permission_mode|hook_event_name|tool_use_id|agent_id|agent_type|tool_name|file_path|notebook_path)"` + sp + `:` + sp + `"[^"\n]*"`)
 	authToken    = regexp.MustCompile(`"token"` + sp + `:` + sp + `"(arx_[A-Za-z0-9_-]+)"`)
 	switchOn     = regexp.MustCompile(`"creative_attention"` + sp + `:` + sp + `true`)
 	switchOff    = regexp.MustCompile(`"creative_attention"` + sp + `:` + sp + `false`)
-	cacheDigits  = regexp.MustCompile(`^[0-9]{1,14}$`)
+	cacheLine    = regexp.MustCompile(`^([1-9][0-9]{0,11}) (on|unknown)$`)
+	camelSplit   = regexp.MustCompile(`([a-z0-9])([A-Z])`)
+	scanSegments = []string{"execute_code", "execute_command", "run_command", "start_process", "run_code", "write_file", "edit_file", "create_file"}
 	httpLocal    = regexp.MustCompile(`^http://(localhost|127\.0\.0\.1)(:[0-9]+)?(/.*)?$`)
 	scanTools    = map[string]bool{"Bash": true, "PowerShell": true, "Write": true, "Edit": true, "MultiEdit": true, "NotebookEdit": true, "WebFetch": true}
 	guardSuffix  = []string{"ai", "labs", "pro", "fast", "dev", "turbo", "max", "lite"}
@@ -130,6 +137,13 @@ func (r guardRules) toolDenied(tool string) bool {
 			return true
 		}
 	}
+	return r.tokensDenied(lower) || r.tokensDenied(asciiLower(camel(tool)))
+}
+
+// camel inserts _ between a lowercase letter or digit and an uppercase letter (generateImage -> generate_Image).
+func camel(s string) string { return camelSplit.ReplaceAllString(s, "${1}_${2}") }
+
+func (r guardRules) tokensDenied(lower string) bool {
 	toks := strings.Fields(nonAlnum.ReplaceAllString(lower, " "))
 	for _, t := range toks {
 		base := stripSuffixes(t)
@@ -148,8 +162,31 @@ func (r guardRules) toolDenied(tool string) bool {
 	return false
 }
 
-// guardNames returns every non-empty "tool_name" value (nested too), plus the JSON-decoded top-level one.
-func guardNames(in []byte) []string {
+// scanTool: tools whose input is text-scanned. The fixed list, plus non-CA MCP tools whose last name segment
+// (camelCase split, lowercased, - as _) contains a code-runner / file-writer word.
+func scanTool(n string) bool {
+	if scanTools[n] {
+		return true
+	}
+	if strings.HasPrefix(n, guardCAPrefix) || !strings.HasPrefix(n, "mcp__") {
+		return false
+	}
+	seg := n
+	if i := strings.LastIndex(n, "__"); i >= 0 {
+		seg = n[i+2:]
+	}
+	seg = strings.ReplaceAll(asciiLower(camel(seg)), "-", "_")
+	for _, w := range scanSegments {
+		if strings.Contains(seg, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// guardNames returns every non-empty "tool_name" value (nested too), plus the JSON-decoded top-level one,
+// and how many values the scan found (the sh guard sees only that scan).
+func guardNames(in []byte) ([]string, int) {
 	var names []string
 	joined := []byte(strings.NewReplacer("\r", " ", "\n", " ").Replace(string(in)))
 	for _, m := range anyToolName.FindAllSubmatch(joined, -1) {
@@ -160,15 +197,19 @@ func guardNames(in []byte) []string {
 	var top struct {
 		ToolName string `json:"tool_name"`
 	}
+	count := len(names)
 	if json.Unmarshal(in, &top) == nil && top.ToolName != "" {
 		names = append(names, top.ToolName)
 	}
-	return names
+	return names, count
 }
 
 // guardDecide returns the deny reason, or "" to allow. lookup is called only when needed.
 func guardDecide(in []byte, r guardRules, lookup func() string) string {
-	names := guardNames(in)
+	names, count := guardNames(in)
+	if count > guardMaxNames {
+		return guardVerdict(lookup())
+	}
 	allCA := len(names) > 0
 	for _, n := range names {
 		if !strings.HasPrefix(n, guardCAPrefix) {
@@ -183,7 +224,7 @@ func guardDecide(in []byte, r guardRules, lookup func() string) string {
 	}
 	scan := false
 	for _, n := range names {
-		scan = scan || scanTools[n]
+		scan = scan || scanTool(n)
 	}
 	cand := false
 	if r.n > 0 {
@@ -213,7 +254,11 @@ func guardDecide(in []byte, r guardRules, lookup func() string) string {
 	if !cand {
 		return ""
 	}
-	switch lookup() {
+	return guardVerdict(lookup())
+}
+
+func guardVerdict(status string) string {
+	switch status {
 	case "off":
 		return ""
 	case "on":
@@ -297,7 +342,9 @@ func fetchStatus(home string) string {
 }
 
 // guardLookup returns the cached switch state, refreshing it from the router when stale.
-// Cache file "<epoch> <state>": on/off live 120 s, unknown 20 s. Write failures are ignored.
+// Cache file "<epoch> <state>": on lives 120 s, unknown 20 s; "off" is never cached, so a forged cache cannot
+// switch the guard off. Only a first line matching ^[1-9][0-9]{0,11} (on|unknown)$ is used. Write failures
+// are ignored.
 func guardLookup() string {
 	home := caHome()
 	dir := os.Getenv("CLAUDE_PLUGIN_DATA")
@@ -308,23 +355,19 @@ func guardLookup() string {
 	now := time.Now().Unix()
 	if raw, err := os.ReadFile(cache); err == nil {
 		line, _, _ := strings.Cut(string(raw), "\n")
-		f := strings.Fields(line)
-		if len(f) == 2 && cacheDigits.MatchString(f[0]) {
-			ts, _ := strconv.ParseInt(f[0], 10, 64)
-			max := int64(0)
-			switch f[1] {
-			case "on", "off":
-				max = 120
-			case "unknown":
+		if m := cacheLine.FindStringSubmatch(line); m != nil {
+			ts, _ := strconv.ParseInt(m[1], 10, 64)
+			max := int64(120)
+			if m[2] == "unknown" {
 				max = 20
 			}
 			if age := now - ts; age >= 0 && age < max {
-				return f[1]
+				return m[2]
 			}
 		}
 	}
 	st := fetchStatus(home)
-	if os.MkdirAll(dir, 0o755) == nil {
+	if st != "off" && os.MkdirAll(dir, 0o755) == nil {
 		if tmp, err := os.CreateTemp(dir, "policy-cache.*.tmp"); err == nil {
 			_, werr := tmp.WriteString(strconv.FormatInt(now, 10) + " " + st + "\n")
 			cerr := tmp.Close()

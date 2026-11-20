@@ -218,15 +218,71 @@ func TestGuardCacheReuse(t *testing.T) {
 	}
 }
 
-func TestGuardCachedOffSkipsRouter(t *testing.T) {
+// TestGuardCacheStrict: "off" is never cached or trusted from the cache (a forged cache cannot switch the
+// guard off), and only lines matching ^[1-9][0-9]{0,11} (on|unknown)$ are reused.
+func TestGuardCacheStrict(t *testing.T) {
 	in := []byte(`{"tool_name":"Bash","tool_input":{"command":"curl https://fal.run/x"}}`)
+	now := strconv.FormatInt(time.Now().Unix(), 10)
+	for _, impl := range guardImpls(t) {
+		for _, forged := range []string{now + " off\n", "0" + now + " on\n", " " + now + " on\n", now + "  on\n",
+			now + " on extra\n", now + " on\r\n", "1234567890123 on\n", now + "\toff\n"} {
+			r := newFakeRouter(t, "on")
+			env, data := guardEnv(t, r.srv.URL, true)
+			os.WriteFile(filepath.Join(data, "policy-cache"), []byte(forged), 0o644)
+			out, _ := runGuardImpl(t, impl, env, in)
+			if got := decision(t, out); got != "deny_on" || r.hits.Load() != 1 {
+				t.Errorf("[%s] cache %q: got %s hits %d (want deny_on, 1 hit)", impl.name, forged, got, r.hits.Load())
+			}
+		}
+		// A valid cached "on" is reused.
+		r := newFakeRouter(t, "off")
+		env, data := guardEnv(t, r.srv.URL, true)
+		os.WriteFile(filepath.Join(data, "policy-cache"), []byte(now+" on\n"), 0o644)
+		if out, _ := runGuardImpl(t, impl, env, in); decision(t, out) != "deny_on" || r.hits.Load() != 0 {
+			t.Errorf("[%s] valid cached on not reused (hits %d)", impl.name, r.hits.Load())
+		}
+		// Switch off: asked every time, never written to the cache.
+		r = newFakeRouter(t, "off")
+		env, data = guardEnv(t, r.srv.URL, true)
+		for i := 0; i < 2; i++ {
+			if out, _ := runGuardImpl(t, impl, env, in); decision(t, out) != "allow" {
+				t.Errorf("[%s] off call %d not allowed", impl.name, i)
+			}
+		}
+		if h := r.hits.Load(); h != 2 {
+			t.Errorf("[%s] off: router hits %d want 2 (off must not be cached)", impl.name, h)
+		}
+		if _, err := os.Stat(filepath.Join(data, "policy-cache")); err == nil {
+			t.Errorf("[%s] off was written to the cache", impl.name)
+		}
+	}
+}
+
+// TestGuardLargeInputs: many nested names fail closed fast; a big single-line Write stays quick.
+func TestGuardLargeInputs(t *testing.T) {
+	var b strings.Builder
+	b.WriteString(`{"tool_name":"Bash","tool_input":{"command":"ls"},"x":[`)
+	for i := 0; i < 2000; i++ {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(`{"tool_name":"mcp__claude_ai_Slack__slack_read_file"}`)
+	}
+	b.WriteString(`]}`)
+	many := []byte(b.String())
+	big, _ := json.Marshal(map[string]any{"tool_name": "Write", "tool_input": map[string]string{"file_path": "/x/a.txt", "content": strings.Repeat("hello world, nothing to see here. ", 300000)}})
 	for _, impl := range guardImpls(t) {
 		r := newFakeRouter(t, "on")
-		env, data := guardEnv(t, r.srv.URL, true)
-		os.WriteFile(filepath.Join(data, "policy-cache"), []byte(strconv.FormatInt(time.Now().Unix(), 10)+" off\n"), 0o644)
-		out, _ := runGuardImpl(t, impl, env, in)
-		if got := decision(t, out); got != "allow" || r.hits.Load() != 0 {
-			t.Errorf("[%s] cached off: got %s hits %d", impl.name, got, r.hits.Load())
+		env, _ := guardEnv(t, r.srv.URL, true)
+		out, took := runGuardImpl(t, impl, env, many)
+		t.Logf("[%s] 2000 nested tool names: %s in %v", impl.name, decision(t, out), took)
+		if decision(t, out) != "deny_on" || took > time.Second {
+			t.Errorf("[%s] 2000 names: got %s in %v (want deny_on < 1s)", impl.name, decision(t, out), took)
+		}
+		out, took = runGuardImpl(t, impl, env, big)
+		t.Logf("[%s] %d MB single-line Write: %s in %v", impl.name, len(big)>>20, decision(t, out), took)
+		if decision(t, out) != "allow" || took > 3*time.Second {
+			t.Errorf("[%s] big Write: got %s in %v (want allow < 3s)", impl.name, decision(t, out), took)
 		}
 	}
 }

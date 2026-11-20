@@ -9,14 +9,22 @@
 # Decision:
 #   1. names = every "tool_name" value in the input (nested ones too: fail closed).
 #   2. Every name is a Creative Attention tool -> deny only when the switch is off.
-#   3. Candidate = a non-CA tool name hit by a tool_* rule, or (only when a name is a scan tool: Bash,
-#      PowerShell, Write, Edit, MultiEdit, NotebookEdit, WebFetch) a `text` rule found in the lowercased input
-#      with the envelope, file_path and notebook_path fields removed. Not a candidate -> allow, no lookup.
-#   4. Candidate -> look up the switch (cached): off -> allow, on -> deny, unknown -> deny.
+#   3. Candidate = a non-CA tool name hit by a tool_* rule (tokens taken as is and with camelCase split), or
+#      (only when a name is a scan tool) a `text` rule found in the lowercased input with the envelope,
+#      file_path and notebook_path fields removed. Scan tools: Bash, PowerShell, Write, Edit, MultiEdit,
+#      NotebookEdit, WebFetch, and non-CA MCP tools whose last name segment (camelCase split, lowercased,
+#      - as _) contains execute_code, execute_command, run_command, start_process, run_code, write_file,
+#      edit_file or create_file. More than 200 tool_name values -> candidate without further analysis.
+#      Not a candidate -> allow, no router lookup.
+#   4. Candidate -> look up the switch: off -> allow, on -> deny, unknown -> deny. Only "on" and "unknown"
+#      are cached ("off" is never cached or trusted from the cache, so a forged cache cannot switch it off).
 # Rules come from guard/rules.txt next to bin/. CA_GUARD_RULES overrides that path only when CA_GUARD_TEST=1
 # (tests). If the rules file is missing, unreadable or has no rules, the guard fails closed: every non-CA
 # mcp__ tool and every scan-tool call is a candidate; CA tools still follow step 2.
 # Always exits 0: Claude Code lets a call through when a hook fails, so denial is printed JSON only.
+# Accepted limits (same class as removing or editing the plugin itself, which the user can always do):
+# CA_GUARD_TEST=1 with CA_GUARD_RULES, ROUTER_URL pointing at a local or attacker-run server, and a curl
+# shadowed earlier on PATH.
 # Note: \u JSON escapes are read literally here (Claude Code never escapes ASCII in hook JSON), while the Go
 # guard also decodes the top-level tool_name. Raw NUL bytes (never valid in JSON) are dropped or kept depending
 # on the shell while Go keeps them, so the two guards may disagree on input that contains NUL.
@@ -28,7 +36,6 @@ CA_PREFIX=mcp__plugin_creative-attention_creative-attention__
 ON_REASON='Company policy: for you, image, audio and video generation only goes through Creative Attention (switched on by an Arlox admin). Use the creative-attention tools instead.'
 UNKNOWN_SUFFIX=' (Your Creative Attention status could not be checked: you may not be signed in yet or the router is unreachable. Ask Claude to run ca_doctor to sign in.)'
 OFF_REASON='Creative Attention is switched off for you. Ask an Arlox admin to switch it on.'
-ENVELOPE='"(session_id|transcript_path|cwd|permission_mode|hook_event_name|tool_use_id|agent_id|agent_type|tool_name|file_path|notebook_path)"[[:space:]]*:[[:space:]]*"[^"]*"'
 nl='
 '
 oifs=$IFS
@@ -43,16 +50,15 @@ rules=$(dirname "$0")/../guard/rules.txt
 if [ "${CA_GUARD_TEST:-}" = 1 ] && [ -n "${CA_GUARD_RULES:-}" ]; then
   rules=$CA_GUARD_RULES
 fi
-LONG= SHORT= PHRASES= TEXTS=
+# Here: count the rules and collect the text rules. The tool_* rules are read again by the awk pass below.
+TEXTS=
 nrules=0
 if [ -r "$rules" ] && [ -f "$rules" ]; then
   rules_txt=$(tr -d '\r' < "$rules" 2>/dev/null) || rules_txt=
   while IFS= read -r line; do
     line=${line%"${line##*[! 	]}"}
     case $line in
-      "tool_long "*) LONG=$LONG${line#tool_long }$nl ;;
-      "tool_short "*) SHORT=$SHORT${line#tool_short }$nl ;;
-      "tool_phrase "*) PHRASES=$PHRASES${line#tool_phrase }$nl ;;
+      "tool_long "*|"tool_short "*|"tool_phrase "*) ;;
       "text "*) TEXTS=$TEXTS${line#text }$nl ;;
       *) continue ;;
     esac
@@ -62,46 +68,100 @@ $rules_txt
 EOF
 fi
 
-# is_denied NAME: 0 when NAME is a non-CA MCP tool hit by a tool_* rule.
-is_denied() {
-  case $1 in
-    "$CA_PREFIX"*) return 1 ;;
-    mcp__*) ;;
-    *) return 1 ;;
-  esac
-  lower=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
-  IFS=$nl
-  for w in $LONG; do
-    case $lower in *"$w"*) IFS=$oifs; return 0 ;; esac
-  done
-  IFS=$oifs
-  tokens=$(printf '%s' "$lower" | tr -c 'a-z0-9' ' ')
-  for t in $tokens; do
-    base=$t
-    prev=
-    while [ "$base" != "$prev" ]; do
-      prev=$base
-      while :; do
-        case $base in *[0-9]) base=${base%?} ;; *) break ;; esac
-      done
-      for sfx in ai labs pro fast dev turbo max lite; do
-        case $base in ?*"$sfx") base=${base%"$sfx"} ;; esac
-      done
-    done
-    IFS=$nl
-    for w in $SHORT; do
-      [ "$base" = "$w" ] && { IFS=$oifs; return 0; }
-    done
-    IFS=$oifs
-  done
-  norm=" $(printf '%s' "$tokens" | tr -s ' ') "
-  IFS=$nl
-  for p in $PHRASES; do
-    case $norm in *" $p "*) IFS=$oifs; return 0 ;; esac
-  done
-  IFS=$oifs
-  return 1
+# Text scan: rules file first (text rules), then the hook input on stdin. Per line: ASCII-lowercase, drop the
+# envelope / file_path / notebook_path string fields, then look for each text rule as a plain substring.
+# (awk index() instead of grep -F: BSD grep -F with ~150 patterns takes seconds on a large Write.)
+TEXT_AWK='
+NR == FNR {
+  gsub(/\r/, "")
+  sub(/[ \t]+$/, "")
+  if (index($0, "text ") == 1) P[++np] = substr($0, 6)
+  next
 }
+{
+  l = tolower($0)
+  gsub(/"(session_id|transcript_path|cwd|permission_mode|hook_event_name|tool_use_id|agent_id|agent_type|tool_name|file_path|notebook_path)"[ \t\v\f\r]*:[ \t\v\f\r]*"[^"]*"/, "", l)
+  for (i = 1; i <= np; i++) if (index(l, P[i])) { hit = 1; exit }
+}
+END { print hit + 0 }'
+
+# One awk pass over all names (GUARD_NAMES, newline-separated) with the tool_* rules read from the rules file.
+# Prints "<all_ca> <scan> <denied>" as 0/1 flags. Mirrors guardDecide/toolDenied/scanTool in launcher/guard.go.
+NAMES_AWK='
+function camel(s,   o, i, c, p) {
+  o = ""; p = ""
+  for (i = 1; i <= length(s); i++) {
+    c = substr(s, i, 1)
+    if (c ~ /[A-Z]/ && p ~ /[a-z0-9]/) o = o "_"
+    o = o c; p = c
+  }
+  return o
+}
+function strip(t,   prev, k, x) {
+  prev = ""
+  while (t != prev) {
+    prev = t
+    sub(/[0-9]+$/, "", t)
+    for (k = 1; k <= 8; k++) {
+      x = SFX[k]
+      if (length(t) > length(x) && substr(t, length(t) - length(x) + 1) == x) t = substr(t, 1, length(t) - length(x))
+    }
+  }
+  return t
+}
+function toks(l,   n, a, i, j, norm) {
+  gsub(/[^a-z0-9]+/, " ", l)
+  n = split(l, a, " ")
+  norm = " "
+  for (i = 1; i <= n; i++) {
+    if (strip(a[i]) in SHORT) return 1
+    norm = norm a[i] " "
+  }
+  for (j = 1; j <= np; j++) if (index(norm, " " PH[j] " ")) return 1
+  return 0
+}
+function denied(n,   lower, i) {
+  if (index(n, CAP) == 1 || index(n, "mcp__") != 1) return 0
+  lower = tolower(n)
+  for (i = 1; i <= nlong; i++) if (index(lower, LONG[i])) return 1
+  return toks(lower) || toks(tolower(camel(n)))
+}
+function scantool(n,   seg, i) {
+  if (n in SCANSET) return 1
+  if (index(n, CAP) == 1 || index(n, "mcp__") != 1) return 0
+  seg = n
+  sub(/.*__/, "", seg)
+  seg = tolower(camel(seg))
+  gsub(/-/, "_", seg)
+  for (i = 1; i <= nscan; i++) if (index(seg, SCANSEG[i])) return 1
+  return 0
+}
+BEGIN {
+  CAP = "mcp__plugin_creative-attention_creative-attention__"
+  split("ai labs pro fast dev turbo max lite", SFX, " ")
+  nscan = split("execute_code execute_command run_command start_process run_code write_file edit_file create_file", SCANSEG, " ")
+  SCANSET["Bash"]; SCANSET["PowerShell"]; SCANSET["Write"]; SCANSET["Edit"]; SCANSET["MultiEdit"]
+  SCANSET["NotebookEdit"]; SCANSET["WebFetch"]
+}
+{
+  gsub(/\r/, "")
+  sub(/[ \t]+$/, "")
+  if (index($0, "tool_long ") == 1) LONG[++nlong] = substr($0, 11)
+  else if (index($0, "tool_short ") == 1) SHORT[substr($0, 12)]
+  else if (index($0, "tool_phrase ") == 1) PH[++np] = substr($0, 13)
+}
+END {
+  nn = split(ENVIRON["GUARD_NAMES"], N, "\n")
+  allca = 0; scan = 0; den = 0; seen = 0
+  for (i = 1; i <= nn; i++) {
+    if (N[i] == "") continue
+    if (!seen) { allca = 1; seen = 1 }
+    if (index(N[i], CAP) != 1) allca = 0
+    if (scantool(N[i])) scan = 1
+    if (!den && denied(N[i])) den = 1
+  }
+  print allca, scan, den
+}'
 
 # --- switch lookup -----------------------------------------------------------------------------------
 ca_home() {
@@ -163,20 +223,24 @@ fetch_status() {
   fi
 }
 
-# lookup: cached switch state. Cache file "<epoch> <state>": on/off live 120 s, unknown 20 s.
+# lookup: switch state. Cache file "<epoch> <state>": on lives 120 s, unknown 20 s; off is never cached.
 lookup() {
   home=$(ca_home)
   dir=${CLAUDE_PLUGIN_DATA:-$home}
   cache=$dir/policy-cache
   now=$(date +%s)
+  # Strict format: ^[1-9][0-9]{0,11} (on|unknown)$ (one line). Anything else counts as no cache.
   if [ -f "$cache" ] && [ -r "$cache" ]; then
-    ts= st=
-    { read -r ts st || :; } < "$cache" 2>/dev/null
+    line=
+    { IFS= read -r line || :; } < "$cache" 2>/dev/null
+    ts=${line%% *}
+    st=${line#* }
     case $ts in
-      ''|*[!0-9]*|???????????????*) ;;
+      ''|0*|*[!0-9]*|?????????????*) ;;
       *)
+        max=0
+        case $st in on) max=120 ;; unknown) max=20 ;; esac
         age=$((now - ts))
-        case $st in on|off) max=120 ;; unknown) max=20 ;; *) max=0 ;; esac
         if [ "$age" -ge 0 ] && [ "$age" -lt "$max" ]; then
           printf '%s' "$st"
           return
@@ -185,7 +249,7 @@ lookup() {
     esac
   fi
   st=$(fetch_status "$home")
-  if mkdir -p "$dir" 2>/dev/null; then
+  if [ "$st" != off ] && mkdir -p "$dir" 2>/dev/null; then
     tmp=$dir/policy-cache.$$.tmp
     if printf '%s %s\n' "$now" "$st" > "$tmp" 2>/dev/null; then
       mv -f "$tmp" "$cache" 2>/dev/null || rm -f "$tmp" 2>/dev/null
@@ -198,57 +262,50 @@ lookup() {
 
 # --- decision ----------------------------------------------------------------------------------------
 input=$(cat)
-names=$(printf '%s\n' "$input" | tr '\r\n' '  ' | grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/^"tool_name"[[:space:]]*:[[:space:]]*"\(.*\)"$/\1/')
-
-all_ca=0
-if [ -n "$names" ]; then
-  all_ca=1
-  IFS=$nl
-  for n in $names; do
-    case $n in "$CA_PREFIX"*) ;; *) all_ca=0 ;; esac
-  done
-  IFS=$oifs
-fi
-if [ "$all_ca" = 1 ]; then
-  [ "$(lookup)" = off ] && deny "$OFF_REASON"
-  exit 0
-fi
-
-# Text scan only for tools that run commands, write files or fetch URLs.
-scan=0
+# Non-empty tool_name values (CR/LF joined first). At most 201 are kept: more than 200 is a candidate without
+# further analysis (fail closed, bounded work).
+names=$(printf '%s\n' "$input" | tr '\r\n' '  ' | grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"][^"]*"' | head -n 201 | sed 's/^"tool_name"[[:space:]]*:[[:space:]]*"\(.*\)"$/\1/')
+count=0
 IFS=$nl
 for n in $names; do
-  case $n in Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|WebFetch) scan=1 ;; esac
+  count=$((count + 1))
 done
 IFS=$oifs
 
-cand=0
-if [ "$nrules" -gt 0 ]; then
-  IFS=$nl
-  for n in $names; do
-    IFS=$oifs
-    is_denied "$n" && { cand=1; break; }
+if [ "$count" -gt 200 ]; then
+  cand=1
+else
+  rfile=$rules
+  [ "$nrules" -gt 0 ] || rfile=/dev/null
+  flags=$(GUARD_NAMES=$names awk "$NAMES_AWK" "$rfile" 2>/dev/null)
+  case $flags in
+    [01]" "[01]" "[01]) ;;
+    *) flags="0 1 1" ;; # awk failed: fail closed
+  esac
+  all_ca=${flags%% *}
+  scan=${flags#* }
+  scan=${scan%% *}
+  denied=${flags##* }
+  if [ "$all_ca" = 1 ]; then
+    [ "$(lookup)" = off ] && deny "$OFF_REASON"
+    exit 0
+  fi
+  cand=0
+  if [ "$nrules" -gt 0 ]; then
+    cand=$denied
+    if [ "$cand" = 0 ] && [ "$scan" = 1 ] && [ -n "$TEXTS" ]; then
+      hit=$(printf '%s\n' "$input" | awk "$TEXT_AWK" "$rules" - 2>/dev/null)
+      case $hit in 0) ;; *) cand=1 ;; esac # 1, or awk failed: fail closed
+    fi
+  else
+    # No rules: fail closed. Every non-CA mcp__ tool and every scan-tool call is a candidate.
     IFS=$nl
-  done
-  IFS=$oifs
-  if [ "$cand" = 0 ] && [ "$scan" = 1 ]; then
-    set --
-    IFS=$nl
-    for p in $TEXTS; do
-      set -- "$@" -e "$p"
+    for n in $names; do
+      case $n in "$CA_PREFIX"*) ;; mcp__*) cand=1 ;; esac
     done
     IFS=$oifs
-    if [ $# -gt 0 ] && printf '%s\n' "$input" | tr 'A-Z' 'a-z' | sed -E "s/$ENVELOPE//g" | grep -qF "$@"; then
-      cand=1
-    fi
+    [ "$scan" = 1 ] && cand=1
   fi
-else
-  IFS=$nl
-  for n in $names; do
-    case $n in "$CA_PREFIX"*) ;; mcp__*) cand=1 ;; esac
-  done
-  IFS=$oifs
-  [ "$scan" = 1 ] && cand=1
 fi
 [ "$cand" = 1 ] || exit 0
 

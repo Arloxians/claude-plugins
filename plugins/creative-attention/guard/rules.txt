@@ -2,7 +2,8 @@
 # One rule per line: <kind> <pattern>. Lines starting with # and blank lines are ignored.
 # Patterns must be lowercase. Kinds:
 #   tool_long    substring of the lowercased MCP tool name
-#   tool_short   whole token of the tool name after suffix stripping (ai labs pro fast dev turbo max lite, trailing digits)
+#   tool_short   whole token of the tool name after suffix stripping (ai labs pro fast dev turbo max lite, trailing digits);
+#                tokens come from the name as is and from the name with camelCase split (generateImage -> generate image)
 #   tool_phrase  phrase matched against the space-normalised tool name tokens
 #   text         lowercased substring of the hook input (envelope, file_path and notebook_path fields removed).
 #                Only scanned for Bash, PowerShell, Write, Edit, MultiEdit, NotebookEdit and WebFetch; other MCP
@@ -54,6 +55,10 @@ tool_short hedra
 tool_short imagegen
 tool_short videogen
 tool_short tts
+tool_short txt2img
+tool_short text2image
+tool_short img2img
+tool_short gptimage
 
 tool_phrase gpt image
 tool_phrase dall e
@@ -65,16 +70,16 @@ tool_phrase generate image
 tool_phrase generate images
 tool_phrase text to image
 tool_phrase text to video
-tool_phrase create image
-tool_phrase create images
 tool_phrase generate video
-tool_phrase create video
 tool_phrase image to video
 tool_phrase text to speech
 tool_phrase generate speech
 tool_phrase generate audio
 tool_phrase generate music
 tool_phrase create speech
+tool_phrase synthesize speech
+tool_phrase images generations
+tool_phrase openai create image
 
 text fal.run
 text fal.ai
@@ -170,20 +175,20 @@ text //udio.com
 text .udio.com
 
 # Google Gemini / Imagen / Veo native generation
-text -flash-image
-text -pro-image
 text gemini-2.5-flash-image
+text -flash-image-preview
+text -pro-image-preview
+text gemini-3-pro-image
 text :generateimages
 text :predictlongrunning
 text generate_images(
 text generate_videos(
 
 # More generation routes. Not listed on purpose: image_generation (the OpenAI Responses tool type; the bare word
-# is common in ordinary code and quote-delimited forms cannot be written here) and "diffusers." (it ends sentences
-# in product copy; "import diffusers" / "from diffusers" cover the library). "replicate run" has no trailing space.
+# is common in ordinary code and quote-delimited forms cannot be written here), "diffusers." (it ends sentences
+# in product copy; "import diffusers" / "from diffusers" cover the library), "replicate run" (hits "replicate
+# runtime"), "pollinations" (prose), "-flash-image" / "-pro-image" (CSS class names; model-id forms are used).
 text pollinations.ai
-text pollinations
-text replicate run
 text npm i replicate
 text npm install replicate
 text pip install replicate
@@ -199,3 +204,26 @@ text api.cartesia.ai
 text api.play.ht
 text texttospeech.googleapis.com
 text api.deepgram.com/v1/speak
+
+# Round 3: the guard's own cache, OpenAI-compatible image endpoints, cloud model ids, local pipelines.
+text policy-cache
+text /images/generations
+text /images/edits
+text /images/variations
+text -image-generation
+text imagegeneration@
+text gpt-image-
+text dall-e-
+text -mini-tts
+text nova-canvas
+text nova-reel
+text titan-image
+text polly synthesize-speech
+text txt2img
+text text2image
+text text2video
+text img2img
+text image-synthesis
+text seedream
+text seedance
+text wavespeed.ai
