@@ -26,7 +26,8 @@ In the Claude admin console, add this to server-managed settings:
 {
   "extraKnownMarketplaces": {
     "arlox": {
-      "source": { "source": "github", "repo": "Arloxians/claude-plugins" }
+      "source": { "source": "github", "repo": "Arloxians/claude-plugins" },
+      "autoUpdate": true
     }
   },
   "enabledPlugins": {
@@ -37,7 +38,7 @@ In the Claude admin console, add this to server-managed settings:
 
 ## 3. Updating
 
-New versions are published here as a new plugin version. To update, run `claude plugin marketplace update arlox` then `claude plugin update creative-attention@arlox` and restart Claude Code (or ask Claude to do it).
+New versions are published here as a new plugin version. With the team settings above (`"autoUpdate": true`), Claude Code picks up a new version by itself: within about ten minutes of the first message in a session it checks this repo and installs the update, then asks you to run `/reload-plugins` (or restart). Auto-update only fires when the plugin's version number changes. Individual installs can turn it on in `/plugin` → Marketplaces → arlox, or update by hand: `claude plugin marketplace update arlox` then `claude plugin update creative-attention@arlox`, and restart Claude Code.
 
 ## Company policy: generation only through Creative Attention
 
