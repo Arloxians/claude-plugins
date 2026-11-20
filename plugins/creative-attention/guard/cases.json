@@ -1,0 +1,905 @@
+[
+ {
+  "name": "tool mcp__plugin_creative-attention_creative-attention__ca_run",
+  "input": {
+   "tool_name": "mcp__plugin_creative-attention_creative-attention__ca_run",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__eachlabs-video__generate",
+  "input": {
+   "tool_name": "mcp__eachlabs-video__generate",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__claude_ai_Higgsfield__create",
+  "input": {
+   "tool_name": "mcp__claude_ai_Higgsfield__create",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__fal__run",
+  "input": {
+   "tool_name": "mcp__fal__run",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__claude_ai_Slack__slack_send_message",
+  "input": {
+   "tool_name": "mcp__claude_ai_Slack__slack_send_message",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "tool mcp__claude_ai_Slack__slack_read_file",
+  "input": {
+   "tool_name": "mcp__claude_ai_Slack__slack_read_file",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "tool mcp__claude_ai_Notion__notion-fetch",
+  "input": {
+   "tool_name": "mcp__claude_ai_Notion__notion-fetch",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "tool Bash",
+  "input": {
+   "tool_name": "Bash",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "tool mcp__lumalabs__generate",
+  "input": {
+   "tool_name": "mcp__lumalabs__generate",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__pikalabs__gen",
+  "input": {
+   "tool_name": "mcp__pikalabs__gen",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__x__veo3fast",
+  "input": {
+   "tool_name": "mcp__x__veo3fast",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__x__fluxpro",
+  "input": {
+   "tool_name": "mcp__x__fluxpro",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__recraftai__gen",
+  "input": {
+   "tool_name": "mcp__recraftai__gen",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__x__seedream_generate",
+  "input": {
+   "tool_name": "mcp__x__seedream_generate",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__openai__images_generate",
+  "input": {
+   "tool_name": "mcp__openai__images_generate",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__claude_ai_Gmail__search_threads",
+  "input": {
+   "tool_name": "mcp__claude_ai_Gmail__search_threads",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "tool mcp__claude_ai_Meta_Ads__ads_get_ad_accounts",
+  "input": {
+   "tool_name": "mcp__claude_ai_Meta_Ads__ads_get_ad_accounts",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "tool mcp__veo3__generate",
+  "input": {
+   "tool_name": "mcp__veo3__generate",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__sora2__generate",
+  "input": {
+   "tool_name": "mcp__sora2__generate",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__falai__generate",
+  "input": {
+   "tool_name": "mcp__falai__generate",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__openai__gpt-image-1",
+  "input": {
+   "tool_name": "mcp__openai__gpt-image-1",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__google__imagen_generate",
+  "input": {
+   "tool_name": "mcp__google__imagen_generate",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__nano-banana__edit",
+  "input": {
+   "tool_name": "mcp__nano-banana__edit",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__comfyui__queue_prompt",
+  "input": {
+   "tool_name": "mcp__comfyui__queue_prompt",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__claude_ai_Google_Drive__search",
+  "input": {
+   "tool_name": "mcp__claude_ai_Google_Drive__search",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "tool mcp__elevenlabs__text_to_speech",
+  "input": {
+   "tool_name": "mcp__elevenlabs__text_to_speech",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__ElevenLabs__text_to_speech",
+  "input": {
+   "tool_name": "mcp__ElevenLabs__text_to_speech",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__claude_ai_ElevenLabs__generate",
+  "input": {
+   "tool_name": "mcp__claude_ai_ElevenLabs__generate",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__higgsfield__generate",
+  "input": {
+   "tool_name": "mcp__higgsfield__generate",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__replicate__run",
+  "input": {
+   "tool_name": "mcp__replicate__run",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__runway__generate",
+  "input": {
+   "tool_name": "mcp__runway__generate",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__plugin_creative-attention_creative-attention__ca_quote",
+  "input": {
+   "tool_name": "mcp__plugin_creative-attention_creative-attention__ca_quote",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 1
+ },
+ {
+  "name": "bash fal on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://fal.run/x",
+    "description": "call fal"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash fal off",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://fal.run/x",
+    "description": "call fal"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "off",
+  "expect": "allow",
+  "router_hits": 1
+ },
+ {
+  "name": "bash fal unknown",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://fal.run/x",
+    "description": "call fal"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "unknown",
+  "expect": "deny_on_unknown",
+  "router_hits": 1
+ },
+ {
+  "name": "bash fal no token",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl https://fal.run/x",
+    "description": "call fal"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "no_token",
+  "expect": "deny_on_unknown",
+  "router_hits": 0
+ },
+ {
+  "name": "bash FAL.AI uppercase on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "curl -X POST https://QUEUE.FAL.AI/x"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash ffmpeg allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "ffmpeg -i a.mp4 b.mp4"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "bash magick allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "magick a.png -resize 50% b.png"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "bash git log allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "git log"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "unknown",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "bash minimax algorithm allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python3 minimax.py  # minimax algorithm with stability audio udio"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "write import replicate on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/tmp/a.py",
+    "content": "import replicate\nout = replicate.run('x')\n"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "write import replicate off",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/tmp/a.py",
+    "content": "import replicate\n"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "off",
+  "expect": "allow",
+  "router_hits": 1
+ },
+ {
+  "name": "write plain allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Write",
+   "tool_input": {
+    "file_path": "/tmp/a.py",
+    "content": "print('hello')\n"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "edit elevenlabs on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Edit",
+   "tool_input": {
+    "file_path": "/tmp/a.ts",
+    "old_string": "x",
+    "new_string": "fetch('https://api.elevenlabs.io/v1/tts')"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "notebookedit diffusers on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "NotebookEdit",
+   "tool_input": {
+    "notebook_path": "/tmp/a.ipynb",
+    "new_source": "from diffusers import StableDiffusionPipeline"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "webfetch stability on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "WebFetch",
+   "tool_input": {
+    "url": "https://api.stability.ai/v2beta",
+    "prompt": "read"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "webfetch docs allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "WebFetch",
+   "tool_input": {
+    "url": "https://docs.python.org/3/",
+    "prompt": "read"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "multiedit fal_client on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "MultiEdit",
+   "tool_input": {
+    "file_path": "/tmp/a.py",
+    "edits": [
+     {
+      "old_string": "a",
+      "new_string": "b"
+     },
+     {
+      "old_string": "c",
+      "new_string": "import fal_client"
+     }
+    ]
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "ca tool off",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__plugin_creative-attention_creative-attention__ca_run",
+   "tool_input": {
+    "pipeline": "x"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "off",
+  "expect": "deny_off",
+  "router_hits": 1
+ },
+ {
+  "name": "ca tool on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__plugin_creative-attention_creative-attention__ca_run",
+   "tool_input": {
+    "pipeline": "x"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 1
+ },
+ {
+  "name": "ca tool unknown",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__plugin_creative-attention_creative-attention__ca_run",
+   "tool_input": {
+    "pipeline": "x"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "unknown",
+  "expect": "allow",
+  "router_hits": 1
+ },
+ {
+  "name": "ca tool no token",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__plugin_creative-attention_creative-attention__ca_quote",
+   "tool_input": {
+    "prompt": "use fal.run"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "no_token",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "ca tool prompt mentions fal on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__plugin_creative-attention_creative-attention__ca_quote",
+   "tool_input": {
+    "prompt": "like fal.run"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 1
+ },
+ {
+  "name": "cwd higgsfield stripped",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/projects/-Users-x-higgsfield-app/t.jsonl",
+   "cwd": "/Users/x/higgsfield-app",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "ls"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "slack message mentions midjourney on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__claude_ai_Slack__slack_send_message",
+   "tool_input": {
+    "text": "try midjourney for this"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "slack plain allow",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__claude_ai_Slack__slack_send_message",
+   "tool_input": {
+    "text": "hello team"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "allow",
+  "router_hits": 0
+ },
+ {
+  "name": "mcp denied tool off",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__claude_ai_Higgsfield__create",
+   "tool_input": {
+    "prompt": "x"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "off",
+  "expect": "allow",
+  "router_hits": 1
+ },
+ {
+  "name": "mcp denied tool unknown",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__claude_ai_Higgsfield__create",
+   "tool_input": {
+    "prompt": "x"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "unknown",
+  "expect": "deny_on_unknown",
+  "router_hits": 1
+ },
+ {
+  "name": "nested higgsfield + Bash",
+  "input": {
+   "session_id": "s",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "mcp__claude_ai_Higgsfield__generate",
+   "tool_input": {
+    "prompt": "x",
+    "tool_name": "Bash"
+   }
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "nested higgsfield + ca",
+  "input": {
+   "tool_name": "mcp__claude_ai_Higgsfield__generate",
+   "tool_input": {
+    "tool_name": "mcp__plugin_creative-attention_creative-attention__x"
+   }
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "nested ca top + higgsfield inner",
+  "input": {
+   "tool_name": "mcp__plugin_creative-attention_creative-attention__ca_run",
+   "tool_input": {
+    "tool_name": "mcp__fal__run"
+   }
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash python openai images",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "python3 -c \"client.images.generate(model='gpt-image-1')\""
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "bash comfyui on",
+  "input": {
+   "session_id": "s1",
+   "transcript_path": "/Users/x/.claude/t.jsonl",
+   "cwd": "/Users/x/proj",
+   "permission_mode": "default",
+   "hook_event_name": "PreToolUse",
+   "tool_name": "Bash",
+   "tool_input": {
+    "command": "cd ComfyUI && python main.py"
+   },
+   "tool_use_id": "toolu_1"
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ }
+]

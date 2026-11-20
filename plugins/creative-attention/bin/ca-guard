@@ -1,61 +1,228 @@
 #!/bin/sh
-# Creative Attention policy guard (PreToolUse hook). Same logic as `ca-launch.exe guard`.
-# Reads the hook JSON on stdin; denies image/video generation tools from other connectors.
-# Note: \u JSON escapes are read literally here (Claude Code never escapes ASCII in hook JSON), unlike the Go guard.
-# Fails closed: if ANY "tool_name" value anywhere in the input is a denied tool, deny.
-LONG="luma pika recraft seedream seededit dreamina higgsfield replicate runway kling minimax hailuo ideogram midjourney leonardo stability eachlabs seedance heygen synthesia elevenlabs"
-SHORT="fal falai veo sora krea flux imagen dalle comfy comfyui wan hunyuan ltx pixverse vidu hedra"
-PHRASES="gpt image|dall e|nano banana|gemini image|image generate|images generate|generate image|generate images|text to image|text to video"
+# Creative Attention policy guard (PreToolUse hook). Same logic as `ca-launch.exe guard` (launcher/guard.go);
+# both are tested against guard/cases.json. POSIX sh only (dash, bash 3.2, Git Bash): no bashisms.
+#
+# A per-teammate switch lives in the Arlox router (GET /auth/cli/me -> "creative_attention": true|false).
+#   on      : image/audio/video generation only through Creative Attention; other generators are denied.
+#   off     : anything goes except Creative Attention itself.
+#   unknown : treated as on (fail closed).
+# Decision:
+#   1. names = every "tool_name" value in the input (nested ones too: fail closed).
+#   2. Every name is a Creative Attention tool -> deny only when the switch is off.
+#   3. Candidate = a non-CA tool name hit by a tool_* rule, or a `text` rule found in the lowercased
+#      input with the envelope fields removed. Not a candidate -> allow, no router lookup.
+#   4. Candidate -> look up the switch (cached): off -> allow, on -> deny, unknown -> deny.
+# Rules come from guard/rules.txt (override: CA_GUARD_RULES). If that file is missing, unreadable or has
+# no rules, every non-CA mcp__ tool is a candidate and the text scan is off (Bash, Write, Edit, WebFetch
+# are then never candidates); CA tools still follow step 2.
+# Always exits 0: Claude Code lets a call through when a hook fails, so denial is printed JSON only.
+# Note: \u JSON escapes are read literally here (Claude Code never escapes ASCII in hook JSON).
+LC_ALL=C
+export LC_ALL
+set -f
 
+CA_PREFIX=mcp__plugin_creative-attention_creative-attention__
+ON_REASON='Company policy: for you, image, audio and video generation only goes through Creative Attention (switched on by an Arlox admin). Use the creative-attention tools instead.'
+UNKNOWN_SUFFIX=' (Your Creative Attention status could not be checked: you may not be signed in yet or the router is unreachable. Ask Claude to run ca_doctor to sign in.)'
+OFF_REASON='Creative Attention is switched off for you. Ask an Arlox admin to switch it on.'
+ENVELOPE='"(session_id|transcript_path|cwd|permission_mode|hook_event_name|tool_use_id|agent_id|agent_type|tool_name)"[[:space:]]*:[[:space:]]*"[^"]*"'
+nl='
+'
+oifs=$IFS
+
+deny() {
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$1"
+  exit 0
+}
+
+# --- rules -------------------------------------------------------------------------------------------
+rules=${CA_GUARD_RULES:-$(dirname "$0")/../guard/rules.txt}
+LONG= SHORT= PHRASES= TEXTS=
+nrules=0
+if [ -r "$rules" ] && [ -f "$rules" ]; then
+  rules_txt=$(tr -d '\r' < "$rules" 2>/dev/null) || rules_txt=
+  while IFS= read -r line; do
+    line=${line%"${line##*[! 	]}"}
+    case $line in
+      "tool_long "*) LONG=$LONG${line#tool_long }$nl ;;
+      "tool_short "*) SHORT=$SHORT${line#tool_short }$nl ;;
+      "tool_phrase "*) PHRASES=$PHRASES${line#tool_phrase }$nl ;;
+      "text "*) TEXTS=$TEXTS${line#text }$nl ;;
+      *) continue ;;
+    esac
+    nrules=$((nrules + 1))
+  done <<EOF
+$rules_txt
+EOF
+fi
+
+# is_denied NAME: 0 when NAME is a non-CA MCP tool hit by a tool_* rule.
 is_denied() {
-  case "$1" in
-    mcp__plugin_creative-attention_creative-attention__*) return 1 ;;
+  case $1 in
+    "$CA_PREFIX"*) return 1 ;;
     mcp__*) ;;
     *) return 1 ;;
   esac
   lower=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
+  IFS=$nl
   for w in $LONG; do
-    case "$lower" in *"$w"*) return 0 ;; esac
+    case $lower in *"$w"*) IFS=$oifs; return 0 ;; esac
   done
+  IFS=$oifs
   tokens=$(printf '%s' "$lower" | tr -c 'a-z0-9' ' ')
   for t in $tokens; do
     base=$t
     prev=
     while [ "$base" != "$prev" ]; do
       prev=$base
-      base=$(printf '%s' "$base" | sed 's/[0-9]*$//')
+      while :; do
+        case $base in *[0-9]) base=${base%?} ;; *) break ;; esac
+      done
       for sfx in ai labs pro fast dev turbo max lite; do
-        case "$base" in ?*"$sfx") base=${base%"$sfx"} ;; esac
+        case $base in ?*"$sfx") base=${base%"$sfx"} ;; esac
       done
     done
+    IFS=$nl
     for w in $SHORT; do
-      [ "$base" = "$w" ] && return 0
+      [ "$base" = "$w" ] && { IFS=$oifs; return 0; }
     done
+    IFS=$oifs
   done
   norm=" $(printf '%s' "$tokens" | tr -s ' ') "
-  oldifs=$IFS
-  IFS='|'
+  IFS=$nl
   for p in $PHRASES; do
-    case "$norm" in *" $p "*) IFS=$oldifs; return 0 ;; esac
+    case $norm in *" $p "*) IFS=$oifs; return 0 ;; esac
   done
-  IFS=$oldifs
+  IFS=$oifs
   return 1
 }
 
-names=$(grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/^"tool_name"[[:space:]]*:[[:space:]]*"\(.*\)"$/\1/')
-deny=0
-set -f
-oldifs=$IFS
-IFS='
-'
-for n in $names; do
-  IFS=$oldifs
-  is_denied "$n" && deny=1
-  IFS='
-'
-done
-IFS=$oldifs
-if [ "$deny" = 1 ]; then
-  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Company policy: image and video generation only goes through Creative Attention (eachlabs via the Arlox router). Use the creative-attention tools instead."}}'
+# --- switch lookup -----------------------------------------------------------------------------------
+ca_home() {
+  if [ -n "${CA_HOME:-}" ]; then
+    printf '%s' "$CA_HOME"
+    return
+  fi
+  if [ -n "${LOCALAPPDATA:-}" ]; then
+    lad=$LOCALAPPDATA
+    if command -v cygpath >/dev/null 2>&1; then
+      lad=$(cygpath -u "$LOCALAPPDATA" 2>/dev/null) || lad=$LOCALAPPDATA
+    fi
+    if [ -d "$lad/creative-attention" ]; then
+      printf '%s' "$lad/creative-attention"
+      return
+    fi
+  fi
+  printf '%s' "${HOME:-}/.creative-attention"
+}
+
+# fetch_status HOME: on | off | unknown, from the router. The token goes to curl on stdin, never argv.
+fetch_status() {
+  [ -r "$1/auth.json" ] || { echo unknown; return; }
+  tok=$(tr -d '\r\n' < "$1/auth.json" 2>/dev/null | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\(arx_[A-Za-z0-9_-][A-Za-z0-9_-]*\)".*/\1/p')
+  [ -n "$tok" ] || { echo unknown; return; }
+  router=${ROUTER_URL:-https://router.arlox.io}
+  while :; do
+    case $router in */) router=${router%/} ;; *) break ;; esac
+  done
+  case $router in
+    https://?*|http://127.0.0.1|http://127.0.0.1[:/]*|http://localhost|http://localhost[:/]*) ;;
+    *) echo unknown; return ;;
+  esac
+  command -v curl >/dev/null 2>&1 || { echo unknown; return; }
+  body=$(printf 'header = "Authorization: Bearer %s"\n' "$tok" | curl -fsS --max-time 3 -K - "$router/auth/cli/me" 2>/dev/null) || { echo unknown; return; }
+  if printf '%s\n' "$body" | grep -q '"creative_attention"[[:space:]]*:[[:space:]]*true'; then
+    echo on
+  elif printf '%s\n' "$body" | grep -q '"creative_attention"[[:space:]]*:[[:space:]]*false'; then
+    echo off
+  else
+    echo unknown
+  fi
+}
+
+# lookup: cached switch state. Cache file "<epoch> <state>": on/off live 120 s, unknown 20 s.
+lookup() {
+  home=$(ca_home)
+  dir=${CLAUDE_PLUGIN_DATA:-$home}
+  cache=$dir/policy-cache
+  now=$(date +%s)
+  if [ -f "$cache" ] && [ -r "$cache" ]; then
+    ts= st=
+    { read -r ts st || :; } < "$cache" 2>/dev/null
+    case $ts in
+      ''|*[!0-9]*|???????????????*) ;;
+      *)
+        age=$((now - ts))
+        case $st in on|off) max=120 ;; unknown) max=20 ;; *) max=0 ;; esac
+        if [ "$age" -ge 0 ] && [ "$age" -lt "$max" ]; then
+          printf '%s' "$st"
+          return
+        fi
+        ;;
+    esac
+  fi
+  st=$(fetch_status "$home")
+  if mkdir -p "$dir" 2>/dev/null; then
+    tmp=$dir/policy-cache.$$.tmp
+    if printf '%s %s\n' "$now" "$st" > "$tmp" 2>/dev/null; then
+      mv -f "$tmp" "$cache" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+    else
+      rm -f "$tmp" 2>/dev/null
+    fi
+  fi
+  printf '%s' "$st"
+}
+
+# --- decision ----------------------------------------------------------------------------------------
+input=$(cat)
+names=$(printf '%s\n' "$input" | grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/^"tool_name"[[:space:]]*:[[:space:]]*"\(.*\)"$/\1/')
+
+all_ca=0
+if [ -n "$names" ]; then
+  all_ca=1
+  IFS=$nl
+  for n in $names; do
+    case $n in "$CA_PREFIX"*) ;; *) all_ca=0 ;; esac
+  done
+  IFS=$oifs
 fi
+if [ "$all_ca" = 1 ]; then
+  [ "$(lookup)" = off ] && deny "$OFF_REASON"
+  exit 0
+fi
+
+cand=0
+if [ "$nrules" -gt 0 ]; then
+  IFS=$nl
+  for n in $names; do
+    IFS=$oifs
+    is_denied "$n" && { cand=1; break; }
+    IFS=$nl
+  done
+  IFS=$oifs
+  if [ "$cand" = 0 ]; then
+    set --
+    IFS=$nl
+    for p in $TEXTS; do
+      set -- "$@" -e "$p"
+    done
+    IFS=$oifs
+    if [ $# -gt 0 ] && printf '%s\n' "$input" | tr 'A-Z' 'a-z' | sed -E "s/$ENVELOPE//g" | grep -qF "$@"; then
+      cand=1
+    fi
+  fi
+else
+  IFS=$nl
+  for n in $names; do
+    case $n in "$CA_PREFIX"*) ;; mcp__*) cand=1 ;; esac
+  done
+  IFS=$oifs
+fi
+[ "$cand" = 1 ] || exit 0
+
+case $(lookup) in
+  off) exit 0 ;;
+  on) deny "$ON_REASON" ;;
+  *) deny "$ON_REASON$UNKNOWN_SUFFIX" ;;
+esac
 exit 0
