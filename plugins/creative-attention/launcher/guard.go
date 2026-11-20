@@ -60,7 +60,7 @@ var (
 
 type guardRules struct {
 	long, short, phrase, guardedPhrase, text []string
-	except                                   map[string]bool
+	except, generator                        map[string]bool
 	n                                        int
 }
 
@@ -97,6 +97,13 @@ func loadGuardRules(path string) guardRules {
 				r.except = map[string]bool{}
 			}
 			r.except[p] = true
+			r.n++
+			continue
+		} else if p, ok := strings.CutPrefix(line, "tool_generator "); ok {
+			if r.generator == nil {
+				r.generator = map[string]bool{}
+			}
+			r.generator[p] = true
 			r.n++
 			continue
 		} else if p, ok := strings.CutPrefix(line, "text "); ok {
@@ -154,25 +161,34 @@ func (r guardRules) toolDenied(tool string) bool {
 	return r.tokensDenied(lower) || r.tokensDenied(c) || r.guardedDenied(lower, c)
 }
 
-// guardedDenied: a tool_phrase_guarded phrase in either token form, unless a tool_except token is present.
+// guardedDenied: a tool_phrase_guarded phrase in either token form, unless a tool_except token is present
+// and no tool_generator token is.
 func (r guardRules) guardedDenied(lower, split string) bool {
 	if len(r.guardedPhrase) == 0 {
 		return false
 	}
 	a := strings.Fields(nonAlnum.ReplaceAllString(lower, " "))
 	b := strings.Fields(nonAlnum.ReplaceAllString(split, " "))
-	for _, t := range append(append([]string{}, a...), b...) {
+	na, nb := " "+strings.Join(a, " ")+" ", " "+strings.Join(b, " ")+" "
+	hit := false
+	for _, p := range r.guardedPhrase {
+		hit = hit || strings.Contains(na, " "+p+" ") || strings.Contains(nb, " "+p+" ")
+	}
+	if !hit {
+		return false
+	}
+	all := append(append([]string{}, a...), b...)
+	for _, t := range all {
+		if r.generator[t] {
+			return true
+		}
+	}
+	for _, t := range all {
 		if r.except[t] {
 			return false
 		}
 	}
-	na, nb := " "+strings.Join(a, " ")+" ", " "+strings.Join(b, " ")+" "
-	for _, p := range r.guardedPhrase {
-		if strings.Contains(na, " "+p+" ") || strings.Contains(nb, " "+p+" ") {
-			return true
-		}
-	}
-	return false
+	return true
 }
 
 // camel inserts _ between a lowercase letter or digit and an uppercase letter (generateImage -> generate_Image).
@@ -245,8 +261,10 @@ func guardDecide(in []byte, r guardRules, lookup func() string) string {
 	if count > guardMaxNames {
 		return guardVerdict(lookup())
 	}
-	for _, n := range names {
-		if len(n) > guardMaxNameLen {
+	// Only the raw-scanned names (names[:count]) are checked, as in the sh guard. A backslash there is a JSON
+	// escape the raw scan cannot read: fail closed.
+	for _, n := range names[:count] {
+		if len(n) > guardMaxNameLen || strings.Contains(n, `\`) {
 			return guardVerdict(lookup())
 		}
 	}

@@ -2982,5 +2982,99 @@
   "status": "on",
   "expect": "deny_on",
   "router_hits": 1
+ },
+ {
+  "name": "tool mcp__azure-openai__create_image (generator wins)",
+  "input": {
+   "tool_name": "mcp__azure-openai__create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__azure_openai__openai_create_image (generator wins)",
+  "input": {
+   "tool_name": "mcp__azure_openai__openai_create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__docker_openai__create_image (generator wins)",
+  "input": {
+   "tool_name": "mcp__docker_openai__create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__openai__create_image_asset (generator wins)",
+  "input": {
+   "tool_name": "mcp__openai__create_image_asset",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__vm_gemini__create_image (generator wins)",
+  "input": {
+   "tool_name": "mcp__vm_gemini__create_image",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__aws__openai_create_video (generator wins)",
+  "input": {
+   "tool_name": "mcp__aws__openai_create_video",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "tool mcp__azure__dalleCreateImage (generator wins)",
+  "input": {
+   "tool_name": "mcp__azure__dalleCreateImage",
+   "tool_input": {}
+  },
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "escaped quote in tool_name",
+  "input": null,
+  "input_raw": "{\"tool_name\":\"mcp__a\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"tool_input\":{}}",
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
+ },
+ {
+  "name": "escaped quote in tool_name off",
+  "input": null,
+  "input_raw": "{\"tool_name\":\"mcp__a\\\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"tool_input\":{}}",
+  "status": "off",
+  "expect": "allow",
+  "router_hits": 1
+ },
+ {
+  "name": "backslash in short tool_name",
+  "input": null,
+  "input_raw": "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"ls\"},\"x\":{\"tool_name\":\"mcp__x\\\\y\"}}",
+  "status": "on",
+  "expect": "deny_on",
+  "router_hits": 1
  }
 ]

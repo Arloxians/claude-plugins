@@ -14,8 +14,8 @@
 #      file_path and notebook_path fields removed. Scan tools: Bash, PowerShell, Write, Edit, MultiEdit,
 #      NotebookEdit, WebFetch, and non-CA MCP tools whose last name segment (camelCase split, lowercased,
 #      - as _) contains execute_code, execute_command, run_command, start_process, run_code, write_file,
-#      edit_file or create_file. More than 200 tool_name values, or any value over 256 bytes -> candidate
-#      without further analysis.
+#      edit_file or create_file. More than 200 tool_name values, or any value over 256 bytes or containing a
+#      backslash (as found by the raw scan) -> candidate without further analysis.
 #      Not a candidate -> allow, no router lookup.
 #   4. Candidate -> look up the switch: off -> allow, on -> deny, unknown -> deny. Only "on" and "unknown"
 #      are cached ("off" is never cached or trusted from the cache, so a forged cache cannot switch it off).
@@ -59,7 +59,7 @@ if [ -r "$rules" ] && [ -f "$rules" ]; then
   while IFS= read -r line; do
     line=${line%"${line##*[! 	]}"}
     case $line in
-      "tool_long "*|"tool_short "*|"tool_phrase "*|"tool_phrase_guarded "*|"tool_except "*) ;;
+      "tool_long "*|"tool_short "*|"tool_phrase "*|"tool_phrase_guarded "*|"tool_except "*|"tool_generator "*) ;;
       "text "*) TEXTS=$TEXTS${line#text }$nl ;;
       *) continue ;;
     esac
@@ -121,16 +121,20 @@ function toks(l,   n, a, i, j, norm) {
   for (j = 1; j <= np; j++) if (index(norm, " " PH[j] " ")) return 1
   return 0
 }
-function guarded(a, b,   na, nb, A, B, i, j) {
+function guarded(a, b,   na, nb, A, B, i, j, hit) {
   if (!ngp) return 0
   gsub(/[^a-z0-9]+/, " ", a)
   gsub(/[^a-z0-9]+/, " ", b)
   na = split(a, A, " ")
   nb = split(b, B, " ")
+  hit = 0
+  for (j = 1; j <= ngp; j++) if (index(" " a " ", " " GP[j] " ") || index(" " b " ", " " GP[j] " ")) hit = 1
+  if (!hit) return 0
+  for (i = 1; i <= na; i++) if (A[i] in GEN) return 1
+  for (i = 1; i <= nb; i++) if (B[i] in GEN) return 1
   for (i = 1; i <= na; i++) if (A[i] in EXC) return 0
   for (i = 1; i <= nb; i++) if (B[i] in EXC) return 0
-  for (j = 1; j <= ngp; j++) if (index(" " a " ", " " GP[j] " ") || index(" " b " ", " " GP[j] " ")) return 1
-  return 0
+  return 1
 }
 function denied(n,   lower, c, i) {
   if (index(n, CAP) == 1 || index(n, "mcp__") != 1) return 0
@@ -164,6 +168,7 @@ BEGIN {
   else if (index($0, "tool_phrase ") == 1) PH[++np] = substr($0, 13)
   else if (index($0, "tool_phrase_guarded ") == 1) GP[++ngp] = substr($0, 21)
   else if (index($0, "tool_except ") == 1) EXC[substr($0, 13)]
+  else if (index($0, "tool_generator ") == 1) GEN[substr($0, 16)]
 }
 END {
   nn = split(ENVIRON["GUARD_NAMES"], N, "\n")
@@ -286,10 +291,12 @@ IFS=$nl
 for n in $names; do
   count=$((count + 1))
   [ "${#n}" -gt 256 ] && long=1
+  case $n in *\\*) long=1 ;; esac # a JSON escape in the name: the raw scan cannot read it, fail closed
 done
 IFS=$oifs
 
-# More than 200 names, or any name over 256 bytes: candidate without further analysis (no word splitting).
+# More than 200 names, any name over 256 bytes, or any name with a backslash (JSON escape): candidate without
+# further analysis (no word splitting).
 if [ "$count" -gt 200 ] || [ "$long" = 1 ]; then
   cand=1
 else

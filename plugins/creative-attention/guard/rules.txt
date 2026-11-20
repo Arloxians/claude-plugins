@@ -8,6 +8,7 @@
 #   tool_phrase_guarded  like tool_phrase, but ignored when any whole token of the tool name (as is or camelCase
 #                split, no suffix stripping) is a tool_except token
 #   tool_except  token that exempts a tool from the tool_phrase_guarded rules (never from the other rules)
+#   tool_generator  token that cancels every tool_except token (a guarded phrase then denies)
 #   text         lowercased substring of the hook input (envelope, file_path and notebook_path fields removed).
 #                Only scanned for Bash, PowerShell, Write, Edit, MultiEdit, NotebookEdit and WebFetch; other MCP
 #                tools (Slack, Notion, Gmail...) are judged by the tool_* rules alone.
@@ -82,9 +83,12 @@ tool_phrase generate music
 tool_phrase create speech
 tool_phrase synthesize speech
 tool_phrase images generations
+tool_phrase openai create image
+tool_phrase openai create video
 
 # Generic create-* tools: a guarded phrase denies unless a tool_except token is also in the tool name
-# (infrastructure tools such as mcp__aws__ec2_create_image or mcp__mux__create_video_assets).
+# (infrastructure tools such as mcp__aws__ec2_create_image or mcp__mux__create_video_assets). A tool_generator
+# token wins over tool_except (mcp__azure-openai__create_image is denied).
 tool_phrase_guarded create image
 tool_phrase_guarded create images
 tool_phrase_guarded create video
@@ -103,6 +107,13 @@ tool_except assets
 tool_except mux
 tool_except vimeo
 tool_except registry
+tool_generator openai
+tool_generator dalle
+tool_generator gemini
+tool_generator imagen
+tool_generator flux
+tool_generator sdxl
+tool_generator stability
 
 text fal.run
 text fal.ai
