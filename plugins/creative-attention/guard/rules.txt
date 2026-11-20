@@ -1,0 +1,140 @@
+# Creative Attention policy guard rules. Read by bin/ca-guard (sh) and `ca-launch.exe guard` (Go).
+# One rule per line: <kind> <pattern>. Lines starting with # and blank lines are ignored.
+# Patterns must be lowercase. Kinds:
+#   tool_long    substring of the lowercased MCP tool name
+#   tool_short   whole token of the tool name after suffix stripping (ai labs pro fast dev turbo max lite, trailing digits)
+#   tool_phrase  phrase matched against the space-normalised tool name tokens
+#   text         lowercased substring of the hook input (envelope fields removed)
+# If this file is missing or has no rules, the guard treats every non-Creative-Attention MCP tool as a
+# candidate and does no text scan (Bash, Write, Edit, WebFetch are then not candidates).
+# Never add bare words that hit normal code (e.g. minimax, stability, audio, udio) as text rules.
+
+tool_long luma
+tool_long pika
+tool_long recraft
+tool_long seedream
+tool_long seededit
+tool_long dreamina
+tool_long higgsfield
+tool_long replicate
+tool_long runway
+tool_long kling
+tool_long minimax
+tool_long hailuo
+tool_long ideogram
+tool_long midjourney
+tool_long leonardo
+tool_long stability
+tool_long eachlabs
+tool_long seedance
+tool_long heygen
+tool_long synthesia
+tool_long elevenlabs
+
+tool_short fal
+tool_short falai
+tool_short veo
+tool_short sora
+tool_short krea
+tool_short flux
+tool_short imagen
+tool_short dalle
+tool_short comfy
+tool_short comfyui
+tool_short wan
+tool_short hunyuan
+tool_short ltx
+tool_short pixverse
+tool_short vidu
+tool_short hedra
+
+tool_phrase gpt image
+tool_phrase dall e
+tool_phrase nano banana
+tool_phrase gemini image
+tool_phrase image generate
+tool_phrase images generate
+tool_phrase generate image
+tool_phrase generate images
+tool_phrase text to image
+tool_phrase text to video
+
+text fal.run
+text fal.ai
+text fal_client
+text @fal-ai/
+text api.replicate.com
+text replicate.com/
+text import replicate
+text from replicate
+text replicate.run(
+text api.openai.com/v1/images
+text images.generate(
+text images.edit(
+text api.openai.com/v1/audio/speech
+text audio.speech.create(
+text api.openai.com/v1/videos
+text videos.create(
+text imagen-
+text veo-2
+text veo-3
+text api.elevenlabs.io
+text from elevenlabs
+text import elevenlabs
+text @elevenlabs/
+text api.runwayml.com
+text api.dev.runwayml.com
+text runwayml
+text api.lumalabs.ai
+text lumaai
+text api.stability.ai
+text stability_sdk
+text higgsfield
+text api.ideogram.ai
+text api.minimax
+text minimaxi.com
+text klingai
+text api.pika.art
+text leonardo.ai
+text midjourney
+text api.bfl.ml
+text api.bfl.ai
+text black-forest-labs
+text api.heygen.com
+text api.synthesia.io
+text api.hedra.com
+text pixverse
+text api.vidu
+text eachlabs.ai
+text api.together.xyz/v1/images
+text api.segmind.com
+text modelslab
+text diffusers
+text stablediffusionpipeline
+text comfyui
+text stable-diffusion-webui
+text invokeai
+text mflux
+text audiocraft
+text musicgen
+text from bark
+text coqui
+text from tts.api
+text kokoro
+text f5_tts
+text f5-tts
+text chatterbox
+text xtts
+text nari-labs
+text parler_tts
+text styletts
+text cosyvoice
+text fish-speech
+text hunyuanvideo
+text cogvideo
+text ltx-video
+text animatediff
+text stable-audio
+text riffusion
+text suno.com
+text udio.com
