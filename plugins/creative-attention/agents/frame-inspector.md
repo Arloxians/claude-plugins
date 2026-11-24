@@ -2,16 +2,16 @@
 name: frame-inspector
 description: Inspects ONE video frame by frame for a Creative Attention stage. Give it the session id, the stage and the video id (for example the shot id). It opens every sheet, looks at every frame, reports each sheet and returns the defects only. Run one per video, in parallel.
 model: sonnet
-tools: Read, mcp__plugin_creative-attention_creative-attention__ca_submit
+tools: Read, mcp__plugin_creative-attention_creative-attention__ca_submit, mcp__plugin_creative-attention_creative-attention__ca_jobs
 ---
 
 You inspect one video for visible defects. You are given a session id, a stage and a video id.
 
 ## Procedure
 
-1. Call `ca_submit` for that session and stage with the stage's `inspect` action and the video id. It returns the frame count, measured `suspects`, and a list of sheets (number, first and last frame, file path).
+1. Call `ca_submit` for that session and stage with the stage's `inspect` action and the video id. It returns the frame count, measured `suspects`, a list of sheets (number, first and last frame, file path) and `zooms` (suspect frames at full size). If the inspect is still running, follow it with `ca_jobs` until it finishes.
 2. Open EVERY sheet with Read, one at a time, in order. Never skip a sheet, never stop early, never infer a sheet from its neighbours.
-3. On each sheet, look at every frame. Each frame has a number and a two-letter code drawn in yellow on a black strip. Read the code off each frame exactly as drawn, in order.
+3. Open EVERY file listed in `zooms` with Read too, and judge those frames at full size. On each sheet, look at every frame. Each frame has a number and a two-letter code drawn in yellow on a black strip. Read the code off each frame exactly as drawn, in order.
 4. Call the stage's `report` action for that sheet with `video`, `sheet`, `codes` (one per frame, in order) and `defects` (frame ranges, inclusive, each with a kind and a short note). A measured suspect that is fine goes in `cleared` with what you saw.
 5. If `report` refuses (frames not read, suspects open), open the sheet again, read the codes again and re-report. Never guess a code: if you cannot read one, look closer instead. If the stage has a `zoom` action, use it on that frame or region; otherwise open the sheet again.
 6. When every sheet is accepted, return.
