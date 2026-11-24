@@ -19,4 +19,4 @@ When helping the user, avoid jargon, say what you are about to do before long st
 
 ## Checking videos frame by frame
 
-When a stage asks for its videos to be inspected, start one `frame-inspector` agent per video, all at the same time, and give each the session id, the stage and its video id. Wait for all of them, then use the defects they return. Do not inspect the sheets yourself, and do not go on to cut or export until every video's inspection is finished.
+When a stage asks for its videos to be inspected, run its `inspect` action for every video first, one after another (free; a stage runs one at a time). Then start one `frame-inspector` agent per video, all at the same time, and give each the session id, the stage, its video id and that inspect result. Wait for all of them, then use the defects they return. Do not inspect the sheets yourself, and do not go on to cut or export until every video's inspection is finished.
