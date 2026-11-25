@@ -12,8 +12,8 @@ import (
 )
 
 type renderCall struct {
-	event, tool, cmd string
-	bg               bool
+	event, tool, cmd, id, desc string
+	bg                         bool
 }
 
 func runRenderCheck(t *testing.T, argv []string, data, cwd string, c renderCall) string {
@@ -28,7 +28,8 @@ func runRenderCheck(t *testing.T, argv []string, data, cwd string, c renderCall)
 	}
 	in, err := json.Marshal(map[string]any{
 		"session_id": "11111111-2222-3333", "cwd": cwd, "hook_event_name": event, "tool_name": tool,
-		"tool_input": map[string]any{"command": c.cmd, "description": "x", "run_in_background": c.bg},
+		"tool_input":  map[string]any{"command": c.cmd, "description": c.desc, "run_in_background": c.bg},
+		"tool_use_id": c.id,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -78,6 +79,7 @@ func TestRenderCheck(t *testing.T) {
 			}
 			write("scenes/final.sh", "#!/bin/zsh\n# render\nB=/Applications/Blender.app/Contents/MacOS/Blender\n\"$B\" -b -P v2.py -- $1\n")
 			write("render.py", "import subprocess\nsubprocess.run([\"blender\", \"--background\", \"x.blend\", \"-a\"])\n")
+			write("var.py", "import subprocess\nBLENDER = \"/Applications/Blender.app/Contents/MacOS/Blender\"\nsubprocess.run([BLENDER, \"-b\", \"a.blend\", \"-a\"])\n")
 			write("plain.sh", "# blender -b in a comment only\necho hello\n")
 			for _, c := range []struct {
 				name, want string
@@ -105,6 +107,22 @@ func TestRenderCheck(t *testing.T) {
 				{"nohup only inside a heredoc", "none", renderCall{cmd: "cat > n.sh <<E\nnohup x\nE\nblender -b a.blend -f 1"}},
 				{"heredoc, then a background render", "deny", renderCall{cmd: "cat > v.py <<'E'\nx = 1\nE\nblender -b a.blend -a &"}},
 				{"backslash before a closing quote", "deny", renderCall{cmd: `echo "a\\\\" ; blender -b a.blend -a`, bg: true}},
+				// Ordinary commands that only mention Blender.
+				{"waiting for a render", "none", renderCall{cmd: `until ! pgrep -f "blender -b"; do sleep 30; done; ls out`, bg: true}},
+				{"ffmpeg from a blender folder", "none", renderCall{cmd: "ffmpeg -framerate 24 -i /Users/a/blender/frames/%04d.png -b:v 20M out.mp4", bg: true}},
+				{"grep in blender-kits", "none", renderCall{cmd: "cd blender-kits; grep -B 3 foo bar.txt", bg: true}},
+				{"curl from blender.org", "none", renderCall{cmd: "curl -b jar https://download.blender.org/x.zip", bg: true}},
+				{"a commit message", "none", renderCall{cmd: "git commit -m 'why blender -b is slow' && npm test", bg: true, desc: "x"}},
+				{"ampersand in a quoted url", "none", renderCall{cmd: `blender -b a.blend -f 1; open "http://x/?a=1&b=2"`}},
+				{"capital B is not background", "none", renderCall{cmd: "blender -B x.blend", bg: true}},
+				// Real ones.
+				{"variable", "deny", renderCall{cmd: "B=/Applications/Blender.app/Contents/MacOS/Blender; \"$B\" -b a.blend -a", bg: true}},
+				{"variable default", "deny", renderCall{cmd: "BL=${BL:-/opt/blender/blender}\n${BL} --background a.blend -a", bg: true}},
+				{"wrapped", "deny", renderCall{cmd: "KEEP=1 caffeinate -i blender -b -P v2.py -- 1 2>&1 | grep Error", bg: true}},
+				{"continued line", "deny", renderCall{cmd: "blender \\\n  -b a.blend -a", bg: true}},
+				{"flag later", "deny", renderCall{cmd: "blender a.blend -E CYCLES -b -a", bg: true}},
+				{"python list inline", "deny", renderCall{cmd: "python3 - <<'E'\nimport subprocess\nsubprocess.run(['blender','-b','a.blend','-a'])\nE", bg: true}},
+				{"python variable", "deny", renderCall{cmd: "python3 var.py", bg: true}},
 				{"quotes and newlines", "deny", renderCall{cmd: "echo \"a \\\"b\\\"\"\nblender -b \"a b.blend\" -a\n", bg: true}},
 			} {
 				if got := runRenderCheck(t, argv, data, cwd, c.call); got != c.want {
@@ -118,23 +136,30 @@ func TestRenderCheck(t *testing.T) {
 			if d := time.Since(start); d > 10*time.Second {
 				t.Errorf("9 MB command took %s", d)
 			}
-			at := func(event, min string) string {
-				return runRenderCheck(t, argv, data, cwd, renderCall{event: event, cmd: "CA_RENDER_ETA_MIN=" + min + " blender -b a.blend -a", bg: true})
+			at := func(event, min, id string) string {
+				return runRenderCheck(t, argv, data, cwd, renderCall{event: event, cmd: "CA_RENDER_ETA_MIN=" + min + " blender -b a.blend -a", bg: true, id: id, desc: "PostToolUse"})
 			}
-			// Allowed once at 100 minutes: less than twice that is not asked again, twice is.
-			if got := at("PostToolUse", "100"); got != "none" {
-				t.Errorf("post: %s", got)
-			}
-			for min, want := range map[string]string{"100": "none", "199": "none", "200": "ask"} {
-				if got := at("PreToolUse", min); got != want {
-					t.Errorf("after 100 allowed, %s: got %s, want %s", min, got, want)
+			want := func(what, got, want string) {
+				t.Helper()
+				if got != want {
+					t.Errorf("%s: got %s, want %s", what, got, want)
 				}
 			}
-			// A shorter one later does not lower what was allowed.
-			at("PostToolUse", "30")
-			if got := at("PreToolUse", "199"); got != "none" {
-				t.Errorf("after a shorter run: %s", got)
+			// A run nobody was asked about records nothing; nor does another call's id.
+			at("PostToolUse", "100", "toolu_1")
+			want("not asked", at("PreToolUse", "100", "toolu_1"), "ask")
+			at("PostToolUse", "100", "toolu_other")
+			want("another id", at("PreToolUse", "100", "toolu_1"), "ask")
+			at("PostToolUse", "900", "toolu_1")
+			want("another estimate", at("PreToolUse", "100", "toolu_1"), "ask")
+			// Allowed at 100 minutes: less than twice that is not asked again, twice is.
+			at("PostToolUse", "100", "toolu_1")
+			for min, w := range map[string]string{"100": "none", "199": "none", "200": "ask"} {
+				want("after 100 allowed, "+min, at("PreToolUse", min, "toolu_2"), w)
 			}
+			// A shorter one later does not lower what was allowed.
+			at("PostToolUse", "30", "toolu_2")
+			want("after a shorter run", at("PreToolUse", "199", "toolu_3"), "none")
 		})
 	}
 }
