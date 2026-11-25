@@ -36,6 +36,8 @@ field() {
         if (match(s, /^[ \t]*:[ \t]*"/)) { s = substr(s, RLENGTH + 1); found = 1; break }
       }
       if (!found) exit
+      # Only the command can be long.
+      if (k != "\"command\"") s = substr(s, 1, 8000)
       # The string ends at the first quote with an even number of backslashes before it.
       m = split(s, q, "\"")
       len = 0
@@ -83,7 +85,7 @@ is_blender() {
       if (match(s, /^[ \t]*(export[ \t]+|local[ \t]+|set[ \t]+|\$env:|\$)?[A-Za-z_][A-Za-z0-9_]*[ \t]*=[ \t]*/)) {
         name = substr(s, RSTART, RLENGTH)
         rest = substr(low, RLENGTH + 1)
-        if (rest ~ /^([^ \t]*|"[^"]*|\047[^\047]*)blender(\.exe)?["\047})]*[ \t]*$/) {
+        if (rest ~ /^([^ \t]*|"[^"]*|\047[^\047]*|["\047]?\$\((command -v|which|type -p)[ \t]+[^)]*)blender(\.exe)?["\047})]*[ \t]*$/) {
           sub(/^[ \t]*(export[ \t]+|local[ \t]+|set[ \t]+|\$env:|\$)?/, "", name); sub(/[ \t]*=.*/, "", name)
           vars[name] = 1
           return 0
@@ -95,20 +97,27 @@ is_blender() {
       t = " " s " "
       low = tolower(t)
       # The executable, then -b or --background as a whole argument after it.
-      if (match(low, /[ \t"\047\/\\]blender(\.exe)?["\047})]*[ \t]/) && flag(substr(t, RSTART + RLENGTH - 1))) return 1
+      if (match(low, /[ \t"\047\/\\(]blender(\.exe)?["\047})]*[ \t]/) && flag(substr(t, RSTART + RLENGTH - 1))) return 1
+      # $BLENDER, ${BLENDER_BIN}, $env:BLENDER: set here, or in the environment.
+      if (match(low, /\$(env:|\{)?[a-z0-9_]*blender[a-z0-9_]*["\047})]*[ \t]/) && flag(substr(t, RSTART + RLENGTH - 1))) return 1
       for (name in vars)
         if (match(t, "[ \t\"\047($&{]" name "[}\"\047)]*[ \t]") && flag(substr(t, RSTART + RLENGTH - 1))) return 1
       return 0
     }
-    function flag(r) { return r ~ /[ \t]["\047]?(-b|--background)["\047]?[ \t]/ }
+    function flag(r) { return r ~ /[ \t]["\047(@]*(-b|--background)["\047)]*[ \t]/ }
     /^[ \t]*(#|REM |rem |\/\/)/ { next }
-    index($0, "=") == 0 && carry == "" && tolower($0) !~ /blender/ && !known { next }
+    # A line with no flag, no assignment, no list and no continuation cannot matter on its own.
+    carry == "" && index($0, "-b") == 0 && index($0, "=") == 0 && index($0, "[") == 0 && $0 !~ /[\\`^]$/ { next }
+    index($0, "=") == 0 && index($0, "[") == 0 && carry == "" && tolower($0) !~ /blender/ && !known { next }
     {
       line = carry $0
       if (line ~ /[\\`^]$/) { carry = substr(line, 1, length(line) - 1) " "; next }
-      carry = ""
-      # Python lists: ["blender", "--background", f] reads as words; $env: and paths keep their signs.
-      if (line ~ /\[/) gsub(/["\047]?[ \t]*,[ \t]*["\047]?/, " ", line)
+      # A Python list over several lines reads as one (at most 40 lines).
+      a = line; opened = gsub(/\[/, "", a); closed = gsub(/\]/, "", a)
+      if (opened > closed && ++joined < 40) { carry = line " "; next }
+      carry = ""; joined = 0
+      # Lists read as words: ["blender", "--background", f]
+      gsub(/["\047]?[ \t]*,[ \t]*["\047]?/, " ", line)
       gsub(/[][]/, " ", line)
       k = split(line, p, /;|&&|\|\||\||[ \t]&[ \t]|[ \t]&$|\n/)
       for (i = 1; i <= k; i++) if (seg(p[i])) { hit = 1; exit }

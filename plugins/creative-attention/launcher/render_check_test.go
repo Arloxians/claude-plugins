@@ -80,6 +80,8 @@ func TestRenderCheck(t *testing.T) {
 			write("scenes/final.sh", "#!/bin/zsh\n# render\nB=/Applications/Blender.app/Contents/MacOS/Blender\n\"$B\" -b -P v2.py -- $1\n")
 			write("render.py", "import subprocess\nsubprocess.run([\"blender\", \"--background\", \"x.blend\", \"-a\"])\n")
 			write("var.py", "import subprocess\nBLENDER = \"/Applications/Blender.app/Contents/MacOS/Blender\"\nsubprocess.run([BLENDER, \"-b\", \"a.blend\", \"-a\"])\n")
+			write("list.py", "import subprocess\nsubprocess.run([\n    \"blender\",\n    \"-b\",\n    \"a.blend\",\n])\n")
+			write("other.py", "x = [\n    \"blender\",\n    \"maya\",\n]\nimport sys\nprint(sys.argv[1], \"-b\")\n")
 			write("plain.sh", "# blender -b in a comment only\necho hello\n")
 			for _, c := range []struct {
 				name, want string
@@ -122,6 +124,14 @@ func TestRenderCheck(t *testing.T) {
 				{"continued line", "deny", renderCall{cmd: "blender \\\n  -b a.blend -a", bg: true}},
 				{"flag later", "deny", renderCall{cmd: "blender a.blend -E CYCLES -b -a", bg: true}},
 				{"python list inline", "deny", renderCall{cmd: "python3 - <<'E'\nimport subprocess\nsubprocess.run(['blender','-b','a.blend','-a'])\nE", bg: true}},
+				{"command -v, unquoted", "deny", renderCall{cmd: "BLENDER=$(command -v blender)\n\"$BLENDER\" -b a.blend -a", bg: true}},
+				{"which, other name", "deny", renderCall{cmd: "X=$(which blender); $X -b a.blend -a", bg: true}},
+				{"variable from the environment", "deny", renderCall{cmd: "${BLENDER_BIN} --background a.blend -a", bg: true}},
+				{"PowerShell variable", "deny", renderCall{tool: "PowerShell", cmd: "& $env:BLENDER -b a.blend -a", bg: true}},
+				{"Start-Process", "deny", renderCall{tool: "PowerShell", cmd: "Start-Process blender -ArgumentList '-b','a.blend','-a'"}},
+				{"Start-Process with one string", "deny", renderCall{tool: "PowerShell", cmd: `Start-Process -FilePath "C:\Program Files\Blender\blender.exe" -ArgumentList "-b a.blend -a"`}},
+				{"python list over several lines", "deny", renderCall{cmd: "python3 list.py", bg: true}},
+				{"python list that is not a render", "none", renderCall{cmd: "python3 other.py", bg: true}},
 				{"python variable", "deny", renderCall{cmd: "python3 var.py", bg: true}},
 				{"quotes and newlines", "deny", renderCall{cmd: "echo \"a \\\"b\\\"\"\nblender -b \"a b.blend\" -a\n", bg: true}},
 			} {
