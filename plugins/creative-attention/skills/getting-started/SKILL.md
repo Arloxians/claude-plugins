@@ -17,6 +17,10 @@ When helping the user, avoid jargon, say what you are about to do before long st
 
 **Company policy:** an Arlox admin turns Creative Attention on or off for each teammate. When it is on, make images, audio and video only through Creative Attention, because a guard blocks other tools that make them. When it is off, Creative Attention's tools will not work for you, and other tools are allowed; ask an Arlox admin if you need it switched on.
 
+## Long renders on this computer
+
+Before any render estimated over 20 minutes, even when the user asked for local, time one real frame and ask with AskUserQuestion: the total time here next to the API price. Ask again when the total at least doubles (more seconds, frames or samples). For a Blender render you run yourself in the background, put `CA_RENDER_ETA_MIN=<total minutes>` in front of the command: a hook refuses it without one, and asks the user over 20 minutes.
+
 ## Checking videos frame by frame
 
 When a stage asks for its videos to be inspected, run its `inspect` action for every video first, one after another (free; a stage runs one at a time). Then start one `frame-inspector` agent per video, all at the same time, and give each the session id, the stage, its video id and that inspect result. Wait for all of them, then use the defects they return. Do not inspect the sheets yourself, and do not go on to cut or export until every video's inspection is finished.

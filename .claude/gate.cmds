@@ -1,5 +1,6 @@
 [always]
 sh -n plugins/creative-attention/bin/ca-guard
+sh -n plugins/creative-attention/bin/ca-render-check
 claude plugin validate .
 [full]
 cd plugins/creative-attention/launcher && go vet ./... && go test ./...

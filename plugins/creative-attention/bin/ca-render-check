@@ -1,0 +1,150 @@
+#!/bin/sh
+# Long Blender renders are the user's choice (PreToolUse + PostToolUse hook on Bash and PowerShell).
+#
+# Only background commands are checked: a foreground command cannot run for 20 minutes. A command is a Blender
+# render when it runs Blender with -b/--background, or names a script file (.sh .zsh .bash .py .ps1 .bat .cmd
+# .command) that does (one level deep).
+#   no CA_RENDER_ETA_MIN=<minutes> in the command -> deny: time a frame, show time against API price, then retry.
+#   20 minutes or less                            -> nothing.
+#   over 20 minutes                               -> ask the user, unless they already allowed an estimate more
+#                                                    than half as long in this session.
+# PostToolUse (the command ran, so the user allowed it) records the estimate.
+# Accepted limits: the estimate is Claude's own; scripts called by scripts and other renderers are not seen.
+# POSIX sh only (dash, bash 3.2, Git Bash). Always exits 0.
+LC_ALL=C
+export LC_ALL
+set -f
+
+LIMIT=20
+SOH=$(printf '\001')
+input=$(tr -d '\000')
+
+case $input in
+  *'"tool_name"'*[Bb]'ash"'*|*'"tool_name"'*'"PowerShell"'*) ;;
+  *) exit 0 ;;
+esac
+
+# Prints one top-level-looking JSON string field, unescaped. $1 = field name.
+field() {
+  printf '%s' "$input" | tr '\n' ' ' | awk -v k="\"$1\"" '
+    {
+      s = $0
+      while ((i = index(s, k)) > 0) {
+        s = substr(s, i + length(k))
+        if (match(s, /^[ \t]*:[ \t]*"/)) { s = substr(s, RLENGTH + 1); found = 1; break }
+      }
+      if (!found) exit
+      # The string ends at the first quote with an even number of backslashes before it.
+      m = split(s, q, "\"")
+      len = 0
+      for (j = 1; j <= m; j++) {
+        len += length(q[j]) + 1
+        n = match(q[j], /\\+$/) ? RLENGTH : 0
+        if (n % 2 == 0) break
+      }
+      print substr(s, 1, len - 1)
+    }' | sed -e "s/\\\\\\\\/$SOH/g" -e 's/\\n/\
+/g' -e 's/\\[tr]/ /g' -e 's/\\"/"/g' -e 's/\\\//\//g' -e "s/$SOH/\\\\/g"
+}
+
+# Cheap checks on the raw text first: most commands end here.
+printf '%s' "$input" | grep -Eiq 'blender|\.(sh|zsh|bash|py|ps1|bat|cmd|command)' || exit 0
+printf '%s' "$input" | grep -Eq '&|nohup|setsid|disown|Start-Process|Start-Job|"run_in_background"[[:space:]]*:[[:space:]]*true' || exit 0
+
+cmd=$(field command)
+[ -n "$cmd" ] || exit 0
+
+# --- background? -----------------------------------------------------------------------------------------
+bg=0
+printf '%s' "$input" | tr '\n' ' ' | grep -q '"run_in_background"[[:space:]]*:[[:space:]]*true' && bg=1
+# The shell lines of the command: the text inside heredocs (code being written to a file) is left out.
+shell=$(printf '%s\n' "$cmd" | awk '
+  end != "" { l = $0; sub(/^[ \t]+/, "", l); if (l == end) end = ""; next }
+  { print }
+  match($0, /<<-?[ \t]*["\047]?[A-Za-z_][A-Za-z0-9_]*/) {
+    end = substr($0, RSTART, RLENGTH); gsub(/[^A-Za-z0-9_]/, "", end)
+  }')
+if [ $bg = 0 ]; then
+  printf '%s\n' "$shell" | grep -Eq '(^|[^[:alnum:]_])(nohup|setsid|disown|Start-Process|Start-Job)([^[:alnum:]_]|$)' && bg=1
+fi
+if [ $bg = 0 ]; then
+  # A single & that ends a command (not && and not a redirection such as 2>&1).
+  printf '%s\n' "$shell" | grep -Eq '(^|[^&>|<])&[[:space:]]*($|[);]|[[:alpha:]])' && bg=1
+fi
+[ $bg = 1 ] || exit 0
+
+# --- Blender? --------------------------------------------------------------------------------------------
+is_blender() { # reads text on stdin
+  tr 'A-Z' 'a-z' | awk '
+    /^[ \t]*#/ { next }
+    index($0, "blender") { b = 1 }
+    { l = " " $0 " " }
+    l ~ /[^a-z0-9-](-b|--background)[^a-z0-9-]/ { g = 1 }
+    END { exit !(b && g) }'
+}
+hit=0
+printf '%s\n' "$cmd" | is_blender && hit=1
+if [ $hit = 0 ]; then
+  cwd=$(field cwd)
+  # Folders a relative script can be in: the session's folder, then every `cd` target in the command.
+  dirs=$(printf '%s\n' "$cmd" | awk -v base="$cwd" '
+    BEGIN { print base }
+    { gsub(/[;&|()]/, " \n "); n = split($0, l, "\n")
+      for (i = 1; i <= n; i++) if (match(l[i], /^[ \t]*cd[ \t]+/)) {
+        d = substr(l[i], RLENGTH + 1); gsub(/^["\047]|["\047]?[ \t]*$/, "", d)
+        if (substr(d, 1, 1) == "/" || d ~ /^[A-Za-z]:/) print d; else print base "/" d
+      } }')
+  scripts=$(printf '%s\n' "$cmd" | tr ' \t;&|()"\047<>=' '\n\n\n\n\n\n\n\n\n\n\n\n' |
+    grep -E '\.(sh|zsh|bash|py|ps1|bat|cmd|command)$' | head -20)
+  oifs=$IFS
+  IFS='
+'
+  for f in $scripts; do
+    case $f in
+      /*|[A-Za-z]:*) paths=$f ;;
+      *) paths=$(for d in $dirs; do printf '%s/%s\n' "$d" "$f"; done) ;;
+    esac
+    for p in $paths; do
+      if [ -f "$p" ] && [ -r "$p" ] && head -c 200000 "$p" | is_blender; then hit=1; break 2; fi
+    done
+  done
+  IFS=$oifs
+fi
+[ $hit = 1 ] || exit 0
+
+# --- the estimate and what was already allowed -----------------------------------------------------------
+eta=$(printf '%s\n' "$cmd" | sed -n 's/.*CA_RENDER_ETA_MIN=\([0-9]\{1,6\}\).*/\1/p' | head -n 1)
+eta=$(printf '%s' "$eta" | sed 's/^0*\([0-9]\)/\1/')
+sid=$(field session_id | tr -cd 'A-Za-z0-9-')
+store=${CLAUDE_PLUGIN_DATA:-${HOME:-/tmp}/.creative-attention}/render-choice
+allowed=
+[ -n "$sid" ] && [ -r "$store/$sid" ] && allowed=$(tr -cd '0-9' < "$store/$sid" | head -c 6)
+
+need=0
+if [ -n "$eta" ] && [ "$eta" -gt $LIMIT ]; then
+  if [ -z "$allowed" ] || [ "$eta" -ge $((allowed * 2)) ]; then need=1; fi
+fi
+
+case $input in
+  *'"hook_event_name"'*'"PostToolUse"'*)
+    if [ $need = 1 ] && [ -n "$sid" ] && mkdir -p "$store" 2>/dev/null; then
+      printf '%s\n' "$eta" > "$store/$sid" 2>/dev/null
+    fi
+    exit 0
+    ;;
+esac
+
+answer() { # decision, reason (no quotes, backslashes or newlines)
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$1" "$2"
+  exit 0
+}
+
+if [ -z "$eta" ]; then
+  answer deny "This starts a Blender render in the background without a time estimate. Time one real frame, work out the total minutes for every frame, and if it is over 20 ask the user with AskUserQuestion: the total time on this computer next to the API price through Creative Attention (ca_quote or ca_models). If they pick local, run it again with CA_RENDER_ETA_MIN=<total minutes> in front of the command."
+fi
+if [ $need = 1 ]; then
+  again=
+  [ -n "$allowed" ] && again=" You allowed about $allowed minutes before."
+  answer ask "Blender render on this computer: about $eta minutes.$again Allow only if you have seen the API price and prefer local."
+fi
+exit 0
